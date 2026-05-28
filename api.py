@@ -54,14 +54,31 @@ def add_income():
 
 def get_db():
     return MySQLdb.connect(
-        # host="127.0.0.1",
-        host="mysql_super_ar",
+        host="127.0.0.1",
+        # host="mysql_super_ar",
         user= os.getenv("MYSQL_USER"),
         passwd= os.getenv("MYSQL_PASSWORD"),
         db= os.getenv("MYSQL_DATABASE"),
         port=int( 3306),
         cursorclass=DictCursor,
     )
+
+def executar_insert_many(sql, valores):
+    conn = get_db()
+    cursor = conn.cursor()
+    print(sql, valores)
+    try:
+        cursor.executemany(sql, valores)
+        conn.commit()
+        cursor.close()
+
+    except Exception as erro:
+        conn.rollback()
+        raise erro
+
+    finally:
+        cursor.close()
+        conn.close()
 
 def executar_insert(sql, valores=None):
     conn = get_db()
@@ -83,9 +100,23 @@ def executar_insert(sql, valores=None):
 def executar_select(sql, valores=None): 
     conn = get_db()
     cursor = conn.cursor()
-
+    print(sql)
+    print(valores)
     try:
         cursor.execute(sql, valores or ())
+        return cursor.fetchall()
+
+    finally:
+        cursor.close()
+        conn.close()
+
+def executar_select1(sql, valores): 
+    conn = get_db()
+    cursor = conn.cursor()
+    print(sql)
+    print(valores)
+    try:
+        cursor.execute(sql, '34')
         return cursor.fetchall()
 
     finally:
@@ -118,6 +149,34 @@ def deletar_comando(comando_id):
             WHERE id = %s
             """,
             (comando_id,),
+        )
+
+        if linhas_afetadas == 0:
+            return jsonify({
+                "status": "erro",
+                "mensagem": "comando não encontrado"
+            }), 404
+
+        return jsonify({
+            "status": "ok",
+            "mensagem": "comando deletado com sucesso"
+        })
+
+    except Exception as erro:
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(erro)
+        }), 500
+
+@app.route("/modelos-marcas/<int:marcaModelo_id>", methods=["DELETE"])
+def deletar_marcaModelo(marcaModelo_id):
+    try:
+        linhas_afetadas = executar_delete(
+            """
+            DELETE FROM modelos_marcas
+            WHERE id = %s
+            """,
+            (marcaModelo_id,),
         )
 
         if linhas_afetadas == 0:
@@ -175,29 +234,42 @@ def inserir_modelo_marca():
 
     except Exception as erro:
         return jsonify({"status": "erro", "mensagem": str(erro)}), 500
-    
+
 @app.route("/modelos-marcas-comandos", methods=["POST"])
 def associar_modelo_comando():
     data = request.json
 
     modelo_marcas = data.get("modelo_marcas")
-    comando = data.get("comando")
-    comando_valor = data.get("comando_valor")
-
-    if not modelo_marcas or not comando:
-        return jsonify({"status": "erro", "mensagem": "modelo_marcas e comando são obrigatórios"}), 400
+    comandos = data.get("comandos")
+    # comando_valor = data.get("comando_valor")
+    print(comandos)
+    if not modelo_marcas or not comandos:
+        return jsonify({"status": "erro", "mensagem": "modelo_marcas e pelo menos 1 comando são obrigatórios"}), 400
 
     try:
-        novo_id = executar_insert(
-            """
+
+        valores = [
+            (
+                modelo_marcas,
+                comando["id"],
+                str(comando["valor"])
+                # "teste"
+            )
+            for comando in comandos
+        ]
+
+        sql = """
             INSERT INTO modelosMarcas_comando
             (modelo_marcas, comando, comando_valor)
             VALUES (%s, %s, %s)
-            """,
-            (modelo_marcas, comando, comando_valor),
-        )
+        """
+        # novo_id = executar_insert(sql)
+        print("valores")
+        print(valores)
 
-        return jsonify({"status": "ok", "id": novo_id})
+        executar_insert_many(sql, valores)
+
+        return jsonify({"status": "ok"})
 
     except Exception as erro:
         return jsonify({"status": "erro", "mensagem": str(erro)}), 500
@@ -279,6 +351,52 @@ def listar_modelos_marcas():
 
     except Exception as erro:
         return jsonify({"status": "erro", "mensagem": str(erro)}), 500
+
+@app.route("/edite-modelos-marcas/<int:modelo_marca_id>", methods=["GET"])
+def listar_modelos_marcas1(modelo_marca_id):
+    resultado =""
+    try:
+        marcaModelo = executar_select(
+            """
+            SELECT id, marca, modelo
+            FROM modelos_marcas
+            WHERE id=%s
+            ORDER BY marca, modelo
+            """
+            , (modelo_marca_id,),
+        )       
+
+    except Exception as erro:
+        return jsonify({"status": "erro", "mensagem": str(erro)}), 500
+    
+    try:
+        comandos = executar_select(
+            """
+            SELECT
+                c.id AS comando_id,
+                c.nome AS comando_nome,
+                CASE
+                    WHEN mmc.id IS NULL THEN false
+                    ELSE true
+                END AS cadastrado_no_modelo
+            FROM comandos c
+            LEFT JOIN modelosMarcas_comando mmc
+                ON mmc.comando = c.id
+            AND mmc.modelo_marcas = %s
+            ORDER BY c.nome;
+            """
+            , (modelo_marca_id,),
+        )
+
+    except Exception as erro:
+        return jsonify({"status": "erro", "mensagem": str(erro)}), 500
+    
+    resultado = {"marcaModelo": marcaModelo[0], "comandos": comandos, "status": "ok"}
+
+    print(comandos)
+    
+    return jsonify(resultado)
+
 
 @app.route("/modelos-marcas/<int:modelo_marca_id>/comandos", methods=["GET"])
 def listar_comandos_por_modelo_marca(modelo_marca_id):
