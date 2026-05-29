@@ -336,6 +336,60 @@ def inserir_sala():
     except Exception as erro:
         return jsonify({"status": "erro", "mensagem": str(erro)}), 500
 
+@app.route("/updateModelosComando", methods=["POST"])
+def updateModelosComando():
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        data = request.json
+        marca = data["marcaValue"]
+        modelo = data["modeloValue"]
+        modelo_marcas_id = data["mmId"]
+        comandos = data["comandos"]
+
+        cursor.execute("START TRANSACTION")
+        c_id = comandos[0]["id"]
+        c_valor = "".join(str(comandos[0]["valor"]))
+
+        cursor.execute(
+            """
+            UPDATE modelos_marcas
+            SET marca = %s, modelo = %s
+            WHERE id = %s
+            """, 
+            (marca, modelo, modelo_marcas_id))
+
+        for comando in comandos:
+            comando_id = comando["id"]
+            comando_valor = comando["valor"]
+
+            if comando_valor is None: #or comando_valor.strip() == ""
+                cursor.execute("""
+                    DELETE FROM modelosMarcas_comando
+                    WHERE modelo_marcas = %s
+                    AND comando = %s
+                """, (modelo_marcas_id, comando_id))
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO modelosMarcas_comando
+                        (modelo_marcas, comando, comando_valor)
+                    VALUES
+                        (%s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        comando_valor = VALUES(comando_valor)
+                    """,
+                    (modelo_marcas_id, comando_id, "".join(str(comando_valor)) ))
+
+        conn.commit()
+
+        print(data)
+        return jsonify({"status": "ok"})
+
+    except Exception as erro:
+        conn.rollback()
+        return jsonify({"status": "erro", "mensagem": str(erro)}), 500
+
 @app.route("/modelos-marcas", methods=["GET"])
 def listar_modelos_marcas():
     try:
