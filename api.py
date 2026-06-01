@@ -54,8 +54,8 @@ def add_income():
 
 def get_db():
     return MySQLdb.connect(
-        host="127.0.0.1",
-        # host="mysql_super_ar",
+        # host="127.0.0.1",
+        host="mysql_super_ar",
         user= os.getenv("MYSQL_USER"),
         passwd= os.getenv("MYSQL_PASSWORD"),
         db= os.getenv("MYSQL_DATABASE"),
@@ -85,7 +85,10 @@ def executar_insert(sql, valores=None):
     cursor = conn.cursor()
 
     try:
-        cursor.execute(sql)
+        if (valores==None):
+            cursor.execute(sql)
+        else:
+            cursor.execute(sql,valores)
         conn.commit()
         return cursor.lastrowid
 
@@ -100,8 +103,6 @@ def executar_insert(sql, valores=None):
 def executar_select(sql, valores=None): 
     conn = get_db()
     cursor = conn.cursor()
-    print(sql)
-    print(valores)
     try:
         cursor.execute(sql, valores or ())
         return cursor.fetchall()
@@ -278,10 +279,13 @@ def associar_modelo_comando():
 def inserir_ar_cadastrado():
     data = request.json
 
-    temperatura_medida = data.get("temperatura_medida")
+    # temperatura_medida = data.get("temperatura_medida")
     temperatura_referencia = data.get("temperatura_referencia")
-    modelo_marca = data.get("modelo_marca")
+    modelo_marca = data.get("marcaModeloId")
     status = data.get("status")
+    atuador = data.get("atuador")
+    nome = data.get("nome")
+    sala = data.get("sala")
 
     if not modelo_marca:
         return jsonify({"status": "erro", "mensagem": "modelo_marca é obrigatório"}), 400
@@ -290,14 +294,16 @@ def inserir_ar_cadastrado():
         novo_id = executar_insert(
             """
             INSERT INTO ar_cadastrados
-            (temperatura_medida, temperatura_referencia, modelo_marca, status)
-            VALUES (%s, %s, %s, %s)
+            (temperatura_referencia, modelo_marca, status, atuador, nome, sala)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
             (
-                temperatura_medida,
                 temperatura_referencia,
                 modelo_marca,
                 status,
+                atuador,
+                nome,
+                sala,
             ),
         )
 
@@ -335,6 +341,42 @@ def inserir_sala():
 
     except Exception as erro:
         return jsonify({"status": "erro", "mensagem": str(erro)}), 500
+
+@app.route("/salas", methods=["GET"])
+def api_lista_salas():
+    salas = lista_salas()
+    if(salas["status"]=="ok"):
+        return jsonify(salas)
+    return jsonify(salas), 500
+
+def lista_salas():
+    try:
+        resultado = executar_select(
+            """
+            SELECT id, nome, codigo, predio
+            FROM salas
+            ORDER BY codigo, nome
+            """
+        )
+
+        return {"status": "ok", "dados": resultado}
+
+    except Exception as erro:
+        return {"status": "erro", "mensagem": str(erro)}
+
+@app.route("/getAddFomrArData", methods=["GET"])
+def getDataToAddFormAr():
+    salas = lista_salas()
+    marca_modelo = listar_modelos_marcas()
+
+    print (marca_modelo)
+
+    if(salas["status"] != "ok"):
+        return salas;
+    if(marca_modelo["status"] != "ok"):
+        return marca_modelo;
+
+    return jsonify({"status": "ok", "salas": salas["dados"], "marcaModelo": marca_modelo["dados"]})
 
 @app.route("/updateModelosComando", methods=["POST"])
 def updateModelosComando():
@@ -391,6 +433,12 @@ def updateModelosComando():
         return jsonify({"status": "erro", "mensagem": str(erro)}), 500
 
 @app.route("/modelos-marcas", methods=["GET"])
+def api_listar_modelos_marcas():
+    valor = listar_modelos_marcas()
+    if(valor["status"]=="ok"):
+        return jsonify(valor)
+    return jsonify(valor), 500
+
 def listar_modelos_marcas():
     try:
         resultado = executar_select(
@@ -401,10 +449,10 @@ def listar_modelos_marcas():
             """
         )
 
-        return jsonify({"status": "ok", "dados": resultado})
+        return {"status": "ok", "dados": resultado}
 
     except Exception as erro:
-        return jsonify({"status": "erro", "mensagem": str(erro)}), 500
+        return {"status": "erro", "mensagem": str(erro)}
 
 @app.route("/edite-modelos-marcas/<int:modelo_marca_id>", methods=["GET"])
 def listar_modelos_marcas1(modelo_marca_id):
@@ -450,7 +498,6 @@ def listar_modelos_marcas1(modelo_marca_id):
     print(comandos)
     
     return jsonify(resultado)
-
 
 @app.route("/modelos-marcas/<int:modelo_marca_id>/comandos", methods=["GET"])
 def listar_comandos_por_modelo_marca(modelo_marca_id):
