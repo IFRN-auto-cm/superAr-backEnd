@@ -369,14 +369,59 @@ def getDataToAddFormAr():
     salas = lista_salas()
     marca_modelo = listar_modelos_marcas()
 
-    print (marca_modelo)
-
     if(salas["status"] != "ok"):
-        return salas;
+        return jsonify(salas), 500;
     if(marca_modelo["status"] != "ok"):
-        return marca_modelo;
+        return jsonify(marca_modelo), 500;
 
     return jsonify({"status": "ok", "salas": salas["dados"], "marcaModelo": marca_modelo["dados"]})
+
+@app.route("/getEditFomrArData/<int:Ar_id>", methods=["GET"])
+def getDataToEditFormAr(Ar_id):
+    salas = lista_salas()
+    marca_modelo = listar_modelos_marcas()
+
+    if(salas["status"] != "ok"):
+        return jsonify(salas), 500;
+    if(marca_modelo["status"] != "ok"):
+        return jsonify(marca_modelo), 500;
+
+    print(Ar_id)
+
+    try:
+        resultado = executar_select(
+            """
+            SELECT
+                ar.id,
+                ar.nome AS nome_ar,
+                ar.temperatura_referencia,
+                s.nome AS sala_nome,
+                s.id as sala_id,
+                mm.id as mm_id,
+                mm.marca,
+                mm.modelo
+            FROM ar_cadastrados ar
+            LEFT JOIN salas s
+                ON ar.sala = s.id
+            LEFT JOIN modelos_marcas mm
+                ON ar.modelo_marca = mm.id
+            WHERE ar.id = %s
+            """,
+            str(Ar_id)
+        )
+
+        resultado = { "editAr": resultado, "salas": salas["dados"], "marcasModelos": marca_modelo["dados"]}
+
+        return jsonify({
+            "status": "ok",
+            "dados": resultado
+        })
+
+    except Exception as erro:
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(erro)
+        }), 500
 
 @app.route("/updateModelosComando", methods=["POST"])
 def updateModelosComando():
@@ -543,6 +588,38 @@ def listar_comandos():
 
     except Exception as erro:
         return jsonify({"status": "erro", "mensagem": str(erro)}), 500
+
+@app.route("/ar-cadastrados", methods=["GET"])
+def listar_ar_cadastrados():
+    try:
+        resultado = executar_select(
+            """
+            SELECT
+                ar.id,
+                ar.nome AS nome_ar,
+                ar.temperatura_referencia,
+                s.nome AS sala_nome,
+                mm.marca,
+                mm.modelo
+            FROM ar_cadastrados ar
+            LEFT JOIN salas s
+                ON ar.sala = s.id
+            LEFT JOIN modelos_marcas mm
+                ON ar.modelo_marca = mm.id
+            ORDER BY s.nome, ar.nome
+            """
+        )
+
+        return jsonify({
+            "status": "ok",
+            "dados": resultado
+        })
+
+    except Exception as erro:
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(erro)
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
