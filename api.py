@@ -54,8 +54,8 @@ def add_income():
 
 def get_db():
     return MySQLdb.connect(
-        # host="127.0.0.1",
-        host="mysql_super_ar",
+        host="127.0.0.1",
+        # host="mysql_super_ar",
         user= os.getenv("MYSQL_USER"),
         passwd= os.getenv("MYSQL_PASSWORD"),
         db= os.getenv("MYSQL_DATABASE"),
@@ -125,6 +125,23 @@ def executar_select1(sql, valores):
         conn.close()
 
 def executar_delete(sql, valores=None):
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(sql, valores or ())
+        conn.commit()
+        return cursor.rowcount
+
+    except Exception as erro:
+        conn.rollback()
+        raise erro
+
+    finally:
+        cursor.close()
+        conn.close()
+
+def executar_update(sql, valores=None):
     conn = get_db()
     cursor = conn.cursor()
 
@@ -311,6 +328,69 @@ def inserir_ar_cadastrado():
 
     except Exception as erro:
         return jsonify({"status": "erro", "mensagem": str(erro)}), 500
+
+@app.route("/ar-cadastrados/<int:ar_cadastrado_id>", methods=["POST"])
+def update_ar_cadastrado(ar_cadastrado_id):
+    data = request.json
+
+    temperatura_medida = 0#data.get("temperatura_medida")
+    temperatura_referencia = data.get("temperatura_referencia")
+    modelo_marca = data.get("marcaModeloId")
+    status = data.get("status")
+    atuador = data.get("atuador")
+    nome = data.get("nome")
+    sala = data.get("sala")
+
+    print(ar_cadastrado_id);
+    print(data);
+
+    if not modelo_marca:
+        return jsonify({
+            "status": "erro",
+            "mensagem": "modelo_marca é obrigatório"
+        }), 400
+    if not sala:
+        return jsonify({
+            "status": "erro",
+            "mensagem": "sala é obrigatória"
+        }), 400
+
+    try:
+        linhas_afetadas = executar_update(
+            """
+            UPDATE ar_cadastrados
+            SET
+                temperatura_medida = %s,
+                temperatura_referencia = %s,
+                modelo_marca = %s,
+                status = %s,
+                atuador = %s,
+                nome = %s,
+                sala = %s
+            WHERE id = %s
+            """,
+            (
+                temperatura_medida,
+                temperatura_referencia,
+                modelo_marca,
+                status,
+                atuador,
+                nome,
+                sala,
+                ar_cadastrado_id,
+            ),
+        )
+
+        return jsonify({
+            "status": "ok",
+            "linhas_afetadas": linhas_afetadas
+        })
+
+    except Exception as erro:
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(erro)
+        }), 500
 
 @app.route("/salas", methods=["POST"])
 def inserir_sala():
