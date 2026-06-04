@@ -768,8 +768,10 @@ def listar_ar_cadastrados():
                 ar.nome AS nome_ar,
                 ar.temperatura_referencia,
                 s.nome AS sala_nome,
+                s.codigo as sala_cod,
                 mm.marca,
-                mm.modelo
+                mm.modelo,
+                ar.atuador
             FROM ar_cadastrados ar
             LEFT JOIN salas s
                 ON ar.sala = s.id
