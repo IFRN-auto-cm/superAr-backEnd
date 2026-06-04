@@ -5,6 +5,8 @@ from flask_cors import CORS
 import MySQLdb
 from MySQLdb.cursors import DictCursor
 import logging
+import paho.mqtt.client as mqtt
+import json
 
 app = Flask(__name__)
 CORS(app)
@@ -51,6 +53,15 @@ def add_income():
     incomes.append(new_income)
     # Return an empty response with a 204 status code (No Content)
     return '', 204
+
+def publicar_mqtt(topico, payload):
+    broker = os.getenv("MQTT_BROKER", "localhost")
+    porta = int(os.getenv("MQTT_PORT", 1883))
+
+    client = mqtt.Client()
+    client.connect(broker, porta, 60)
+    client.publish(topico, json.dumps(payload))
+    client.disconnect()
 
 def get_db():
     return MySQLdb.connect(
@@ -422,6 +433,83 @@ def inserir_sala():
     except Exception as erro:
         return jsonify({"status": "erro", "mensagem": str(erro)}), 500
 
+@app.route("/ar-cadastrados/<int:ar_cadastrado_id>/enviar-comando", methods=["POST"])
+def enviar_comando_ar(ar_cadastrado_id):
+    data = request.json
+
+    comando_id = 1 #data.get("comando_id")
+
+    if not comando_id:
+        return jsonify({
+            "status": "erro",
+            "mensagem": "comando_id é obrigatório"
+        }), 400
+    
+    print(ar_cadastrado_id)
+    print(comando_id)
+    # return jsonify({"status": "ok"})
+
+    try:
+        # resultado = []
+        resultado = executar_select(
+            """
+            SELECT
+                ar.id AS ar_id,
+                ar.nome AS ar_nome,
+                ar.atuador,
+                ar.modelo_marca,
+                c.id AS comando_id,
+                c.nome AS comando_nome,
+                mmc.comando_valor
+            FROM ar_cadastrados ar
+            INNER JOIN modelosMarcas_comando mmc
+                ON mmc.modelo_marcas = ar.modelo_marca
+            INNER JOIN comandos c
+                ON c.id = mmc.comando
+            WHERE ar.id = %s
+              AND c.id = %s
+            """,
+            (ar_cadastrado_id, comando_id)
+        )
+
+        if len(resultado) == 0:
+            return jsonify({
+                "status": "erro",
+                "mensagem": "Comando não cadastrado para o modelo deste ar-condicionado"
+            }), 404
+
+        dados = resultado[0]
+
+        if not dados["atuador"]:
+            return jsonify({
+                "status": "erro",
+                "mensagem": "Este ar-condicionado não possui atuador cadastrado"
+            }), 400
+
+        payload = {
+            # "ar_id": dados["ar_id"],
+            # "comando_id": dados["comando_id"],
+            # "comando_nome": dados["comando_nome"],
+            "comando_valor": dados["comando_valor"]
+        }
+
+        endereco_atuador = dados["atuador"]
+
+        publicar_mqtt(endereco_atuador, payload)
+
+        return jsonify({
+            "status": "ok",
+            "mensagem": "Comando enviado com sucesso",
+            "endereco": endereco_atuador,
+            "payload": payload
+        })
+
+    except Exception as erro:
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(erro)
+        }), 500
+
 @app.route("/salas", methods=["GET"])
 def api_lista_salas():
     salas = lista_salas()
@@ -701,6 +789,13 @@ def listar_ar_cadastrados():
             "status": "erro",
             "mensagem": str(erro)
         }), 500
+
+@app.route("/enviar-comando/<int:ar_cadastrado_id>", methods=["GET"])
+def acionar_comando(ar_cadastrado_id):
+    data = request.json
+
+    comando = request.json["comando"]
+    
 
 if __name__ == '__main__':
     app.run(debug=True)
