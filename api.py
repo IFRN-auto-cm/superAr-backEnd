@@ -479,7 +479,8 @@ def getDataToEditFormAr(Ar_id):
                 s.id as sala_id,
                 mm.id as mm_id,
                 mm.marca,
-                mm.modelo
+                mm.modelo,
+                ar.atuador
             FROM ar_cadastrados ar
             LEFT JOIN salas s
                 ON ar.sala = s.id
