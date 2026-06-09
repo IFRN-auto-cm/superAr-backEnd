@@ -506,11 +506,14 @@ def enviar_comando_ar(ar_cadastrado_id):
                 "mensagem": "Este ar-condicionado não possui atuador cadastrado"
             }), 400
 
+        vetor = json.loads(dados["comando_valor"])
+        print(len(vetor))   
         payload = {
             # "ar_id": dados["ar_id"],
             # "comando_id": dados["comando_id"],
             # "comando_nome": dados["comando_nome"],
-            "comando_valor": dados["comando_valor"]
+            "comando_valor": vetor,#dados["comando_valor"],
+            "length": len(vetor)
         }
 
         endereco_atuador = dados["atuador"]
