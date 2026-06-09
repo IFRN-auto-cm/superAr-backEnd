@@ -7,6 +7,7 @@ from MySQLdb.cursors import DictCursor
 import logging
 import paho.mqtt.client as mqtt
 import json
+import re
 
 app = Flask(__name__)
 CORS(app)
@@ -54,13 +55,30 @@ def add_income():
     # Return an empty response with a 204 status code (No Content)
     return '', 204
 
-def publicar_mqtt(topico, payload):
+def normalizar(texto):
+    # Encontra o primeiro número na string
+    numero = re.search(r'\d+', texto)
+
+    if not numero:
+        return re.sub(r'\s+', '', texto).lower()
+
+    numero = numero.group()
+
+    # Remove todos os números
+    descricao = re.sub(r'\d+', '', texto)
+
+    # Remove todos os espaços e converte para minúsculas
+    descricao = re.sub(r'\s+', '', descricao).lower()
+
+    return f"{descricao} {numero}"
+
+def publicar_mqtt(endereco, payload):
     broker = os.getenv("MQTT_BROKER", "localhost")
     porta = int(os.getenv("MQTT_PORT", 1883))
 
     client = mqtt.Client()
     client.connect(broker, porta, 60)
-    client.publish(topico, json.dumps(payload))
+    client.publish("cm/ar/"+endereco+"/cmd", json.dumps(payload))
     client.disconnect()
 
 def get_db():
@@ -231,6 +249,8 @@ def inserir_comando():
 
     # return jsonify({"status": "ok", "id": 1})
     nome = data.get("nome")
+
+    nome = normalizar(nome)
 
     if not nome:
         return jsonify({"status": "erro", "mensagem": "nome é obrigatório"}), 400
