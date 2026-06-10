@@ -458,19 +458,15 @@ def inserir_sala():
 
 @app.route("/ar-cadastrados/<int:ar_cadastrado_id>/enviar-comando", methods=["POST"])
 def enviar_comando_ar(ar_cadastrado_id):
-    data = request.json
+    
+    data = request.json   
+    comando_nome = data.get("comando_nome")
 
-    comando_id = 1 #data.get("comando_id")
-
-    if not comando_id:
+    if not comando_nome:
         return jsonify({
             "status": "erro",
-            "mensagem": "comando_id é obrigatório"
+            "mensagem": "comando_nome é obrigatório"
         }), 400
-    
-    print(ar_cadastrado_id)
-    print(comando_id)
-    # return jsonify({"status": "ok"})
 
     try:
         # resultado = []
@@ -490,9 +486,9 @@ def enviar_comando_ar(ar_cadastrado_id):
             INNER JOIN comandos c
                 ON c.id = mmc.comando
             WHERE ar.id = %s
-              AND c.id = %s
+              AND c.nome = %s
             """,
-            (ar_cadastrado_id, comando_id)
+            (ar_cadastrado_id, comando_nome)
         )
 
         if len(resultado) == 0:
