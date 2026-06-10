@@ -75,8 +75,11 @@ def normalizar(texto):
 def publicar_mqtt(endereco, payload):
     broker = os.getenv("MQTT_BROKER", "localhost")
     porta = int(os.getenv("MQTT_PORT", 1883))
+    usuario = os.getenv("USUARIO")
+    senha = os.getenv("SENHA")
 
     client = mqtt.Client()
+    client.username_pw_set(usuario, senha)
     client.connect(broker, porta, 60)
     client.publish("cm/ar/"+endereco+"/cmd", json.dumps(payload))
     client.disconnect()
