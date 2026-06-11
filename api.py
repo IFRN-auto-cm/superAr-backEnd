@@ -511,7 +511,7 @@ def enviar_comando_ar(ar_cadastrado_id):
             # "ar_id": dados["ar_id"],
             # "comando_id": dados["comando_id"],
             # "comando_nome": dados["comando_nome"],
-            "comando_valor": vetor,#dados["comando_valor"],
+            "irCmd": vetor,#dados["comando_valor"],
             "length": len(vetor)
         }
 
