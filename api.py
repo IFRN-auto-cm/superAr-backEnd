@@ -35,26 +35,6 @@ load_dotenv()
 # logger.addHandler(terminal_logger)
 # logger.addHandler(file_logger)
 
-# Sample in-memory data
-incomes = [
-    {'description': 'salario fak', 'amount': 60000},
-    {'description': 'freelanceee', 'amount': 2000}
-]
-
-# GET endpoint to retrieve all incomes
-@app.route('/incomes', methods=['GET'])
-def get_incomes():
-    return jsonify(incomes)
-
-# POST endpoint to add a new income
-@app.route('/incomes', methods=['POST'])
-def add_income():
-    # Get JSON data from the request body
-    new_income = request.get_json()
-    incomes.append(new_income)
-    # Return an empty response with a 204 status code (No Content)
-    return '', 204
-
 def normalizar(texto):
     # Encontra o primeiro número na string
     numero = re.search(r'\d+', texto)
