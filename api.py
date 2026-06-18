@@ -66,8 +66,8 @@ def publicar_mqtt(endereco, payload):
 
 def get_db():
     return MySQLdb.connect(
-        host="127.0.0.1",
-        # host="mysql_super_ar",
+        # host="127.0.0.1",
+        host="mysql_super_ar",
         user= os.getenv("MYSQL_USER"),
         passwd= os.getenv("MYSQL_PASSWORD"),
         db= os.getenv("MYSQL_DATABASE"),
