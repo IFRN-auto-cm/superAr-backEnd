@@ -70,7 +70,7 @@ def get_db():
         user= os.getenv("MYSQL_USER"),
         passwd= os.getenv("MYSQL_PASSWORD"),
         db= os.getenv("MYSQL_DATABASE"),
-        port=int( 3306),
+        port= int(os.getenv("DB_PORT")),
         cursorclass=DictCursor,
     )
 
