@@ -35,11 +35,11 @@ load_dotenv()
 # logger.addHandler(terminal_logger)
 # logger.addHandler(file_logger)
 
-def salvar_status_no_banco(atuador, ir_cmd, length, cmd_type):
+def salvar_status_no_banco(device, state, sensors, diagnostics, statistics):
     conn = get_db()
     cursor = conn.cursor()
 
-    print("dados: ", atuador)
+    print("dados: ", device)
 
     # try:
     #     cursor.execute(
@@ -80,12 +80,15 @@ def registrar_status_mqtt():
             "erro": "Corpo da requisição deve ser um JSON"
         }), 400
 
-    atuador = dados.get("atuador")
-    ir_cmd = dados.get("irCmd")
-    length = dados.get("length")
-    cmd_type = dados.get("cmdType")
+    device = dados.get("atuador")
+    state = dados.get("state")
+    sensors = dados.get("sensors")
+    diagnostics = dados.get("diagnostics")
+    statistics = dados.get("statistics")
 
-    if not atuador:
+    print(statistics)
+
+    if not device:
         return jsonify({
             "erro": "O campo atuador é obrigatório"
         }), 400
@@ -93,10 +96,11 @@ def registrar_status_mqtt():
     try:
         # Substitua pela função que já utiliza para acessar o banco.
         resultado = salvar_status_no_banco(
-            atuador=atuador,
-            ir_cmd=ir_cmd,
-            length=length,
-            cmd_type=cmd_type
+            device=device,
+            state=state,
+            sensors=sensors,
+            diagnostics=diagnostics,
+            statistics=statistics
         )
 
         return jsonify({
