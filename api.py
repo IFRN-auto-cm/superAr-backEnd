@@ -35,6 +35,82 @@ load_dotenv()
 # logger.addHandler(terminal_logger)
 # logger.addHandler(file_logger)
 
+def salvar_status_no_banco(atuador, ir_cmd, length, cmd_type):
+    conn = get_db()
+    cursor = conn.cursor()
+
+    print("dados: ", atuador)
+
+    # try:
+    #     cursor.execute(
+    #         """
+    #         INSERT INTO historico_comandos
+    #             (atuador, ir_cmd, tamanho, tipo_comando)
+    #         VALUES
+    #             (%s, %s, %s, %s)
+    #         """,
+    #         (
+    #             atuador,
+    #             ir_cmd,
+    #             length,
+    #             cmd_type
+    #         )
+    #     )
+
+    #     conn.commit()
+    #     registro_id = cursor.lastrowid
+
+    #     return {
+    #         "id": registro_id
+    #     }
+
+    # except Exception:
+    #     conn.rollback()
+    #     raise
+
+    # finally:
+    #     cursor.close()
+
+@app.post("/internal/mqtt/status")
+def registrar_status_mqtt():
+    dados = request.get_json(silent=True)
+
+    if not isinstance(dados, dict):
+        return jsonify({
+            "erro": "Corpo da requisição deve ser um JSON"
+        }), 400
+
+    atuador = dados.get("atuador")
+    ir_cmd = dados.get("irCmd")
+    length = dados.get("length")
+    cmd_type = dados.get("cmdType")
+
+    if not atuador:
+        return jsonify({
+            "erro": "O campo atuador é obrigatório"
+        }), 400
+
+    try:
+        # Substitua pela função que já utiliza para acessar o banco.
+        resultado = salvar_status_no_banco(
+            atuador=atuador,
+            ir_cmd=ir_cmd,
+            length=length,
+            cmd_type=cmd_type
+        )
+
+        return jsonify({
+            "mensagem": "Status registrado",
+            "resultado": resultado
+        }), 201
+
+    except Exception as erro:
+        app.logger.exception("Erro ao registrar status MQTT")
+
+        return jsonify({
+            "erro": "Não foi possível registrar o status"
+        }), 500
+
 def normalizar(texto):
     # Encontra o primeiro número na string
     numero = re.search(r'\d+', texto)
