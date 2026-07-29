@@ -8,10 +8,12 @@ import logging
 import paho.mqtt.client as mqtt
 import json
 import re
+import redisAccess as redis
 
 app = Flask(__name__)
 CORS(app)
 load_dotenv()
+redis.teste()
 
 # logger = logging.getLogger("AIPO_NFC_READER")
 # logging.basicConfig(filename='allLogs.log', encoding='ISO-8859-1', level=logging.DEBUG)
@@ -79,6 +81,8 @@ def registrar_status_mqtt():
         return jsonify({
             "erro": "Corpo da requisição deve ser um JSON"
         }), 400
+
+    redis.atualizar_estado_dispositivo(dados)
 
     device = dados.get("atuador")
     state = dados.get("state")
