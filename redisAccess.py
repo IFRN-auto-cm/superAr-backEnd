@@ -62,3 +62,33 @@ def atualizar_estado_dispositivo(ar_id, sala_id, dados: dict[str, Any]) -> None:
       ex=ONLINE_TTL_SECONDS,
     )
     pipeline.execute()
+
+def consultar_estado_dispositivo(device_id: str) -> dict | None:
+    state_key = f"superar:device:{device_id}:state"
+    online_key = f"superar:device:{device_id}:online"
+
+    estado = redis_client.hgetall(state_key)
+
+    if not estado:
+        return None
+
+    estado["online"] = bool(redis_client.exists(online_key))
+
+    estado["power"] = estado.get("power") == "1"
+
+    for campo in ("ar_cadastrado_id", "sala_id"):
+        valor = estado.get(campo)
+
+        if valor:
+            estado[campo] = int(valor)
+
+    for campo in (
+        "temperatura_medida",
+        "temperatura_setpoint",
+    ):
+        valor = estado.get(campo)
+
+        if valor:
+            estado[campo] = float(valor)
+
+    return estado
