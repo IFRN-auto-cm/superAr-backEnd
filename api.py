@@ -890,8 +890,8 @@ def registrar_status_mqtt():
     print(statistics)
 
 
-    print("**************************************************")
-    print(redis.consultar_estado_dispositivo(device["id"]))
+    # print("**************************************************")
+    # print(redis.consultar_estado_dispositivo(device["id"]))
 
     return jsonify({
                 "mensagem": "Status registrado",
@@ -919,7 +919,17 @@ def registrar_status_mqtt():
         return jsonify({
             "erro": "Não foi possível registrar o status"
         }), 500
-    
+
+@app.route("/status-ar/<int:ar_cadastrado_id>", methods=["GET"])
+def enviar_status_ar(ar_cadastrado_id):
+
+    resposta = redis.consultar_estado_dispositivo("irClient-D8BC38A94716")
+    print(resposta)
+
+    return jsonify({
+            "status": "ok",
+            "resultado": resposta
+        }), 201
 
 if __name__ == '__main__':
     app.run(debug=True)
