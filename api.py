@@ -523,13 +523,24 @@ def enviar_comando_ar(ar_cadastrado_id):
             }), 400
 
         vetor = json.loads(dados["comando_valor"])
-        print(len(vetor))   
+        # print(len(vetor))   
+
+        print(comando_nome.casefold())
+        referencia=0
+        if(comando_nome.casefold() == "desligar"):
+            cmdType = "desligar"
+        elif (comando_nome.casefold().split()[0]=="ligar"):
+            cmdType = "ligar"
+            referencia = comando_nome.split()[1]
+
         payload = {
             # "ar_id": dados["ar_id"],
             # "comando_id": dados["comando_id"],
             # "comando_nome": dados["comando_nome"],
             "irCmd": vetor,#dados["comando_valor"],
-            "length": len(vetor)
+            "length": len(vetor),
+            "cmdType": cmdType,
+            "ref": referencia
         }
 
         endereco_atuador = dados["atuador"]
