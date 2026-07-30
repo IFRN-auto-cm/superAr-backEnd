@@ -73,52 +73,6 @@ def salvar_status_no_banco(device, state, sensors, diagnostics, statistics):
     # finally:
     #     cursor.close()
 
-@app.post("/internal/mqtt/status")
-def registrar_status_mqtt():
-    dados = request.get_json(silent=True)
-
-    if not isinstance(dados, dict):
-        return jsonify({
-            "erro": "Corpo da requisição deve ser um JSON"
-        }), 400
-
-    redis.atualizar_estado_dispositivo(dados)
-
-    device = dados.get("atuador")
-    state = dados.get("state")
-    sensors = dados.get("sensors")
-    diagnostics = dados.get("diagnostics")
-    statistics = dados.get("statistics")
-
-    print(statistics)
-
-    if not device:
-        return jsonify({
-            "erro": "O campo atuador é obrigatório"
-        }), 400
-
-    try:
-        # Substitua pela função que já utiliza para acessar o banco.
-        resultado = salvar_status_no_banco(
-            device=device,
-            state=state,
-            sensors=sensors,
-            diagnostics=diagnostics,
-            statistics=statistics
-        )
-
-        return jsonify({
-            "mensagem": "Status registrado",
-            "resultado": resultado
-        }), 201
-
-    except Exception as erro:
-        app.logger.exception("Erro ao registrar status MQTT")
-
-        return jsonify({
-            "erro": "Não foi possível registrar o status"
-        }), 500
-
 def normalizar(texto):
     # Encontra o primeiro número na string
     numero = re.search(r'\d+', texto)
@@ -882,6 +836,89 @@ def acionar_comando(ar_cadastrado_id):
     data = request.json
 
     comando = request.json["comando"]
+
+@app.post("/internal/mqtt/status")
+def registrar_status_mqtt():
+    dados = request.get_json(silent=True)
+    
+    if not isinstance(dados, dict):
+        return jsonify({
+            "erro": "Corpo da requisição deve ser um JSON"
+        }), 400
+
+    # print(dados)
+
+    sql = """
+        SELECT
+            ac.id AS ar_cadastrado_id,
+            s.id AS sala_id
+        FROM ar_cadastrados ac
+        INNER JOIN salas s
+            ON s.id = ac.sala
+        WHERE ac.atuador = %s;
+        """
+
+    device = dados.get("device")
+    state = dados.get("state")
+    sensors = dados.get("sensors")
+    diagnostics = dados.get("diagnostics")
+    statistics = dados.get("statistics")
+
+    if not device:
+        return jsonify({
+            "erro": "O campo atuador é obrigatório"
+        }), 400
+
+    try:
+        # Substitua pela função que já utiliza para acessar o banco.       
+        r = executar_select(sql, (device.get("id"),),)
+        sala_condicionador = r[0]
+
+    except Exception as erro:
+        app.logger.exception("Erro ao registrar status MQTT")
+
+        return jsonify({
+            "erro": "Não foi possível registrar o status"
+        }), 500
+
+    redis.atualizar_estado_dispositivo(
+        sala_condicionador.get("ar_cadastrado_id"),
+        sala_condicionador.get("sala_id"), 
+        dados)
+
+    print("statistics: ")
+    print(statistics)
+
+
+    print("**************************************************")
+    print(redis.consultar_estado_dispositivo(device["id"]))
+
+    return jsonify({
+                "mensagem": "Status registrado",
+                "resultado": sala_condicionador
+            }), 201
+
+    try:
+        # Substitua pela função que já utiliza para acessar o banco.
+        resultado = salvar_status_no_banco(
+            device=device,
+            state=state,
+            sensors=sensors,
+            diagnostics=diagnostics,
+            statistics=statistics
+        )
+
+        return jsonify({
+            "mensagem": "Status registrado",
+            "resultado": resultado
+        }), 201
+
+    except Exception as erro:
+        app.logger.exception("Erro ao registrar status MQTT")
+
+        return jsonify({
+            "erro": "Não foi possível registrar o status"
+        }), 500
     
 
 if __name__ == '__main__':
