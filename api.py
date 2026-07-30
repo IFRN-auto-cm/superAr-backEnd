@@ -820,6 +820,25 @@ def listar_ar_cadastrados():
             """
         )
 
+        for ar in resultado:
+            arStatus = redis.consultar_estado_dispositivo(ar["id"])
+            if(arStatus != None):
+
+                ar["temperatura_medida"] = arStatus["temperatura_medida"]
+                ar["status"] = "ligado" if arStatus["power"] else "desligado"
+
+                if(arStatus["temperatura_setpoint"] < -100):
+                    ar["temperatura_referencia"]    = "indefinido"
+                else:
+                    ar["temperatura_referencia"]    = arStatus["temperatura_setpoint"]
+
+            else:
+                ar["status"]                = "desconhecido"
+                ar["temperatura_medida"]    = "desconhecido"
+            print("vamos q vamos %s", ar["id"])
+            print(arStatus)
+
+
         return jsonify({
             "status": "ok",
             "dados": resultado
