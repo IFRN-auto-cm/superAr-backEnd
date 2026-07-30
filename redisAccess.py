@@ -43,11 +43,11 @@ def atualizar_estado_dispositivo(ar_id, sala_id, dados: dict[str, Any]) -> None:
     "device_id": device_id,
     "ar_cadastrado_id": ar_id,
     "sala_id": sala_id,
-    "temperatura_medida": str(sensors.get("temperature")),
-    "temperatura_setpoint": str(state.get("temperaturaReferencia")),
+    "temperatura_medida": str(sensors.get("tempe")),
+    "temperatura_setpoint": str(state.get("refer")),
     "power": converter_booleano(state.get("power", False)),
     "modo": str(state.get("modo", "")),
-    "fan_speed": str(state.get("fan_speed", "")),
+    "fan_speed": str(state.get("fanSp", "")),
     "atualizado_em": atualizado_em,
   }
 
