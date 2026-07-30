@@ -21,8 +21,15 @@ def converter_booleano(valor: Any) -> str:
   return "1" if bool(valor) else "0"
 
 
-def atualizar_estado_dispositivo(dados: dict[str, Any]) -> None:
-  device_id = dados.get("device_id")
+def atualizar_estado_dispositivo(ar_id, sala_id, dados: dict[str, Any]) -> None:
+
+  device = dados.get("device")
+  state = dados.get("state")
+  sensors = dados.get("sensors")
+  diagnostics = dados.get("diagnostics")
+  statistics = dados.get("statistics")
+
+  device_id = device.get("id")
 
   if not device_id:
     raise ValueError("A mensagem não possui device_id")
@@ -34,17 +41,17 @@ def atualizar_estado_dispositivo(dados: dict[str, Any]) -> None:
 
   estado = {
     "device_id": device_id,
-    "ar_cadastrado_id": str(dados.get("ar_cadastrado_id", "")),
-    "sala_id": str(dados.get("sala_id", "")),
-    "temperatura_medida": str(dados.get("temperatura_medida", "")),
-    "temperatura_setpoint": str(
-      dados.get("temperatura_setpoint", "")
-    ),
-    "power": converter_booleano(dados.get("power", False)),
-    "modo": str(dados.get("modo", "")),
-    "fan_speed": str(dados.get("fan_speed", "")),
+    "ar_cadastrado_id": ar_id,
+    "sala_id": sala_id,
+    "temperatura_medida": str(sensors.get("temperature")),
+    "temperatura_setpoint": str(state.get("temperaturaReferencia")),
+    "power": converter_booleano(state.get("power", False)),
+    "modo": str(state.get("modo", "")),
+    "fan_speed": str(state.get("fan_speed", "")),
     "atualizado_em": atualizado_em,
   }
+
+  print(estado)
 
   # Pipeline reduz o número de viagens entre aplicação e Redis.
   with redis_client.pipeline(transaction=True) as pipeline:
