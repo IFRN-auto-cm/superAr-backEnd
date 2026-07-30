@@ -34,8 +34,8 @@ def atualizar_estado_dispositivo(ar_id, sala_id, dados: dict[str, Any]) -> None:
   if not device_id:
     raise ValueError("A mensagem não possui device_id")
 
-  state_key = f"superar:device:{device_id}:state"
-  online_key = f"superar:device:{device_id}:online"
+  state_key = f"superar:device:{ar_id}:state"
+  online_key = f"superar:device:{ar_id}:online"
 
   atualizado_em = datetime.now(timezone.utc).isoformat()
 
