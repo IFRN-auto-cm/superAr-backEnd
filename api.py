@@ -9,9 +9,11 @@ import paho.mqtt.client as mqtt
 import json
 import re
 import redisAccess as redis
+from mySocketio import init_socketio, emitir_status_ar, socketio
 
 app = Flask(__name__)
 CORS(app)
+init_socketio(app)
 load_dotenv()
 redis.teste()
 
@@ -906,10 +908,20 @@ def registrar_status_mqtt():
             "erro": "Não foi possível registrar o status"
         }), 500
 
+    ar_cadastrado_id = sala_condicionador.get("ar_cadastrado_id")
+    sala_id = sala_condicionador.get("sala_id")
+
     redis.atualizar_estado_dispositivo(
-        sala_condicionador.get("ar_cadastrado_id"),
-        sala_condicionador.get("sala_id"), 
-        dados)
+        ar_cadastrado_id,
+        sala_id, 
+        dados
+    )
+
+    emitir_status_ar(
+        ar_cadastrado_id=ar_cadastrado_id,
+        sala_id=sala_id,
+        dados=dados,
+    )
 
     print("statistics: ")
     print(statistics)
@@ -957,4 +969,10 @@ def enviar_status_ar(ar_cadastrado_id):
         }), 201
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # app.run(debug=True)
+    socketio.run(
+        app,
+        host="0.0.0.0",
+        port=5000,
+        debug=True
+    )
