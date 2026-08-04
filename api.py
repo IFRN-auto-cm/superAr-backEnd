@@ -9,7 +9,7 @@ import paho.mqtt.client as mqtt
 import json
 import re
 import redisAccess as redis
-from mySocketio import init_socketio, emitir_status_ar, socketio
+from mySocketio import init_socketio, emitir_status_ar, socketio, emitir_status_all_ar
 
 app = Flask(__name__)
 CORS(app)
@@ -967,6 +967,50 @@ def enviar_status_ar(ar_cadastrado_id):
             "status": "ok",
             "resultado": resposta
         }), 201
+
+@app.get("/teste-socket")
+def teste_socket():
+
+    ar_cadastrado_id =1
+    sala_id = 10
+    dados={
+        "device": {
+            "id": "dispositivo-teste"
+        },
+        "state": {
+            "power": True
+        },
+        "sensors": {
+            "temperature": 23.5
+        },
+        "diagnostics": {
+            "RSSI": -52
+        },
+        "statistics": {
+            "tempo_ligado": 120
+        },
+        "atuador": "atuador-teste",
+        "topico": "teste/socket"
+    }
+
+    # emitir_status_ar(
+    #     ar_cadastrado_id=ar_cadastrado_id,
+    #     sala_id=sala_id,
+    #     dados=dados
+    # )
+
+    emitir_status_all_ar(
+        ar_cadastrado_id=ar_cadastrado_id,
+        sala_id=sala_id,
+        socketIO_sala="dashboard",
+        dados=dados
+    )
+
+    return jsonify({
+        "status": "ok",
+        "mensagem": "Evento emitido"
+    })
+
 
 if __name__ == '__main__':
     # app.run(debug=True)
