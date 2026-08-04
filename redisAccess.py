@@ -87,8 +87,9 @@ def consultar_estado_dispositivo(device_id: str) -> dict | None:
     "temperatura_setpoint",
   ):
     valor = estado.get(campo)
-
     if valor:
-      estado[campo] = float(valor)
-
+      try:
+        estado[campo] = float(valor)
+      except ValueError:
+        estado[campo] = None
   return estado
