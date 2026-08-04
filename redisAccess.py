@@ -51,7 +51,7 @@ def atualizar_estado_dispositivo(ar_id, sala_id, dados: dict[str, Any]) -> None:
     "atualizado_em": atualizado_em,
   }
 
-  print(estado)
+  redis_client.sadd("ars", state_key)
 
   # Pipeline reduz o número de viagens entre aplicação e Redis.
   with redis_client.pipeline(transaction=True) as pipeline:
@@ -93,3 +93,16 @@ def consultar_estado_dispositivo(device_id: str) -> dict | None:
       except ValueError:
         estado[campo] = None
   return estado
+
+
+def get_data_all_ars():
+  ids = redis_client.smembers("ars")
+
+  pipe = redis_client.pipeline()
+
+  for ar_id in ids:
+      pipe.hgetall(ar_id)
+
+  equipamentos = pipe.execute()
+
+  return equipamentos

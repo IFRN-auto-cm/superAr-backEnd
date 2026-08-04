@@ -968,6 +968,17 @@ def enviar_status_ar(ar_cadastrado_id):
             "resultado": resposta
         }), 201
 
+@app.route("/status-all-ar", methods=["GET"])
+def enviar_status_all_ar():
+
+    dados = redis.get_data_all_ars()
+
+    return jsonify({
+        "status": "ok",
+        "mensagem": "get ars",
+        "data": dados
+    })
+
 @app.get("/teste-socket")
 def teste_socket():
 
