@@ -5,7 +5,8 @@ from flask_cors import CORS
 import MySQLdb
 from MySQLdb.cursors import DictCursor
 import logging
-import paho.mqtt.client as mqtt
+# import paho.mqtt.client as mqtt
+import mqtt_service_client
 import json
 import re
 import redisAccess as redis
@@ -93,16 +94,10 @@ def normalizar(texto):
     return f"{descricao} {numero}"
 
 def publicar_mqtt(endereco, payload):
-    broker = os.getenv("MQTT_BROKER", "localhost")
-    porta = int(os.getenv("MQTT_PORT", 1883))
-    usuario = os.getenv("MQTT_LOGIN")
-    senha = os.getenv("MQTT_PASSWORD")
-
-    client = mqtt.Client()
-    client.username_pw_set(usuario, senha)
-    client.connect(broker, porta, 60)
-    client.publish("cm/ar/"+endereco+"/cmd", json.dumps(payload))
-    client.disconnect()
+    return mqtt_service_client.publicar_comando_ar(
+        atuador=endereco,
+        payload=payload
+    )
 
 def get_db():
     return MySQLdb.connect(
