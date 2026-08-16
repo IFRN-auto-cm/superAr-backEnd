@@ -3,7 +3,6 @@ import os
 
 import requests
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -12,8 +11,8 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 MQTT_SERVICE_URL = os.getenv(
-    "MQTT_SERVICE_URL",
-    "http://mqtt-service:5002"
+  "MQTT_SERVICE_URL",
+  "http://mqtt-service:5002"
 )
 
 
@@ -22,11 +21,11 @@ MQTT_SERVICE_URL = os.getenv(
 # ============================================================
 
 class MQTTServiceError(Exception):
-    """
-    Erro de comunicação com o mqtt_service.
-    """
+  """
+  Erro de comunicação com o mqtt_service.
+  """
 
-    pass
+  pass
 
 
 # ============================================================
@@ -34,10 +33,10 @@ class MQTTServiceError(Exception):
 # ============================================================
 
 def publicar(
-    topic,
-    payload,
-    qos=0,
-    retain=False
+  topic,
+  payload,
+  qos=0,
+  retain=False
 ):
 
     try:
@@ -124,102 +123,81 @@ def publicar(
             "Erro de comunicação com o serviço MQTT"
         ) from erro
 
+def publicar_comando_ar( atuador, payload ):
 
-def publicar_comando_ar(
-    atuador,
-    payload
-):
+  """
+  Solicita ao mqtt_service que publique
+  um comando destinado a um ar-condicionado.
 
-    """
-    Solicita ao mqtt_service que publique
-    um comando destinado a um ar-condicionado.
+  A API NÃO conhece o tópico MQTT.
+  """
 
-    A API NÃO conhece o tópico MQTT.
-    """
+  try:
+    resposta = requests.post(
+
+      f"{MQTT_SERVICE_URL}/ar/comando",
+
+      json={
+        "atuador": atuador,
+        "payload": payload
+      },
+
+      timeout=5
+    )
+    resposta.raise_for_status()
+
+    return resposta.json()
+
+  except requests.Timeout as erro:
+    raise MQTTServiceError(
+      "Timeout ao acessar o serviço MQTT"
+    ) from erro
+
+  except requests.ConnectionError as erro:
+    raise MQTTServiceError(
+      "Serviço MQTT indisponível"
+    ) from erro
+
+  except requests.HTTPError as erro:
+    mensagem = (
+      "Não foi possível publicar "
+      "o comando MQTT"
+    )
 
     try:
+      dados = erro.response.json()
 
-        resposta = requests.post(
+      mensagem = dados.get(
+          "mensagem",
+          mensagem
+      )
 
-            f"{MQTT_SERVICE_URL}/ar/comando",
+    except Exception:
+      pass
 
-            json={
-                "atuador": atuador,
-                "payload": payload
-            },
+    raise MQTTServiceError(
+      mensagem
+    ) from erro
 
-            timeout=5
-        )
-
-
-        resposta.raise_for_status()
-
-
-        return resposta.json()
-
-
-    except requests.Timeout as erro:
-
-        raise MQTTServiceError(
-            "Timeout ao acessar o serviço MQTT"
-        ) from erro
-
-
-    except requests.ConnectionError as erro:
-
-        raise MQTTServiceError(
-            "Serviço MQTT indisponível"
-        ) from erro
-
-
-    except requests.HTTPError as erro:
-
-        mensagem = (
-            "Não foi possível publicar "
-            "o comando MQTT"
-        )
-
-        try:
-
-            dados = erro.response.json()
-
-            mensagem = dados.get(
-                "mensagem",
-                mensagem
-            )
-
-        except Exception:
-            pass
-
-
-        raise MQTTServiceError(
-            mensagem
-        ) from erro
-
-
-    except requests.RequestException as erro:
-
-        raise MQTTServiceError(
-            "Erro de comunicação com "
-            "o serviço MQTT"
-        ) from erro
-
+  except requests.RequestException as erro:
+    raise MQTTServiceError(
+      "Erro de comunicação com "
+      "o serviço MQTT"
+    ) from erro
 
 def verificar_status():
 
-    try:
+  try:
+    resposta = requests.get(
+      f"{MQTT_SERVICE_URL}/health",
+      timeout=3
+    )
 
-        resposta = requests.get(
-            f"{MQTT_SERVICE_URL}/health",
-            timeout=3
-        )
+    resposta.raise_for_status()
 
-        resposta.raise_for_status()
+    return resposta.json()
 
-        return resposta.json()
-
-    except requests.RequestException as erro:
-
-        raise MQTTServiceError(
-            "mqtt_service indisponível"
-        ) from erro
+  except requests.RequestException as erro:
+    raise MQTTServiceError(
+      "mqtt_service indisponível"
+    ) from erro
