@@ -8,3 +8,4 @@ python-dotenv==1.1.0
 mysqlclient==2.2.7
 paho-mqtt==2.1.0
 redis==6.4.0
+requests
