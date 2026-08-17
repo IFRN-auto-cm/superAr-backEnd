@@ -20,6 +20,12 @@ def teste():
 def converter_booleano(valor: Any) -> str:
   return "1" if bool(valor) else "0"
 
+def atualizar_online_offline(ar_id, sala_id, device_id, online: bool) -> None:
+  print("Ar id: ", ar_id)
+  print("Sala id: ", sala_id)
+  print("Device id: ", device_id)
+  print("Online: ", online)
+  pass
 
 def atualizar_estado_dispositivo(ar_id, sala_id, dados: dict[str, Any]) -> None:
 

@@ -892,7 +892,6 @@ def registrar_status_mqtt():
         }), 400
 
     try:
-        # Substitua pela função que já utiliza para acessar o banco.       
         r = executar_select(sql, (device.get("id"),),)
         sala_condicionador = r[0]
 
@@ -955,7 +954,41 @@ def registrar_status_mqtt():
 @app.post("/internal/mqtt/availability")
 def registrar_availability():
     dados = request.get_json(silent=True)
+    
+
+    if not isinstance(dados, dict):
+        return jsonify({
+            "erro": "Corpo da requisição deve ser um JSON"
+        }), 400
+
     print(dados)
+    device_id = dados.get("atuador")
+
+    sql = """
+        SELECT
+            ac.id AS ar_cadastrado_id,
+            s.id AS sala_id
+        FROM ar_cadastrados ac
+        INNER JOIN salas s
+            ON s.id = ac.sala
+        WHERE ac.atuador = %s;
+        """
+
+    try:
+        r = executar_select(sql, (device_id,),)
+        sala_condicionador = r[0]
+
+    except Exception as erro:
+        app.logger.exception("Erro ao registrar status MQTT")
+
+        return jsonify({
+            "erro": "Não foi possível registrar o status"
+        }), 500
+
+    print(sala_condicionador)
+    ar_id = sala_condicionador.get("ar_cadastrado_id")
+    sala_id = sala_condicionador.get("sala_id")
+    redis.atualizar_online_offline(ar_id, sala_id, device_id, dados.get("online"))
 
     return jsonify({
             "mensagem": "Status registrado"
