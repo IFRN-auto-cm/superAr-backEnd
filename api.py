@@ -952,6 +952,16 @@ def registrar_status_mqtt():
             "erro": "Não foi possível registrar o status"
         }), 500
 
+@app.post("/internal/mqtt/availability")
+def registrar_availability():
+    dados = request.get_json(silent=True)
+    print(dados)
+
+    return jsonify({
+            "mensagem": "Status registrado"
+        }), 200
+
+
 @app.route("/status-ar/<int:ar_cadastrado_id>", methods=["GET"])
 def enviar_status_ar(ar_cadastrado_id):
 
