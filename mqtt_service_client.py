@@ -10,10 +10,7 @@ logger = logging.getLogger(__name__)
 # Configuração
 # ============================================================
 
-MQTT_SERVICE_URL = os.getenv(
-  "MQTT_SERVICE_URL",
-  "http://mqtt-service:5002"
-)
+MQTT_SERVICE_URL = os.getenv( "MQTT_SERVICE_URL" )
 
 
 # ============================================================
