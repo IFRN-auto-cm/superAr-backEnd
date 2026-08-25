@@ -5,13 +5,18 @@ from flask_cors import CORS
 import MySQLdb
 from MySQLdb.cursors import DictCursor
 import logging
-import paho.mqtt.client as mqtt
+# import paho.mqtt.client as mqtt
+import mqtt_service_client
 import json
 import re
+import redisAccess as redis
+from mySocketio import init_socketio, emitir_status_ar, socketio, emitir_status_all_ar
 
 app = Flask(__name__)
 CORS(app)
+init_socketio(app)
 load_dotenv()
+redis.teste()
 
 # logger = logging.getLogger("AIPO_NFC_READER")
 # logging.basicConfig(filename='allLogs.log', encoding='ISO-8859-1', level=logging.DEBUG)
@@ -35,6 +40,42 @@ load_dotenv()
 # logger.addHandler(terminal_logger)
 # logger.addHandler(file_logger)
 
+def salvar_status_no_banco(device, state, sensors, diagnostics, statistics):
+    conn = get_db()
+    cursor = conn.cursor()
+
+    print("dados: ", device)
+
+    # try:
+    #     cursor.execute(
+    #         """
+    #         INSERT INTO historico_comandos
+    #             (atuador, ir_cmd, tamanho, tipo_comando)
+    #         VALUES
+    #             (%s, %s, %s, %s)
+    #         """,
+    #         (
+    #             atuador,
+    #             ir_cmd,
+    #             length,
+    #             cmd_type
+    #         )
+    #     )
+
+    #     conn.commit()
+    #     registro_id = cursor.lastrowid
+
+    #     return {
+    #         "id": registro_id
+    #     }
+
+    # except Exception:
+    #     conn.rollback()
+    #     raise
+
+    # finally:
+    #     cursor.close()
+
 def normalizar(texto):
     # Encontra o primeiro número na string
     numero = re.search(r'\d+', texto)
@@ -53,16 +94,10 @@ def normalizar(texto):
     return f"{descricao} {numero}"
 
 def publicar_mqtt(endereco, payload):
-    broker = os.getenv("MQTT_BROKER", "localhost")
-    porta = int(os.getenv("MQTT_PORT", 1883))
-    usuario = os.getenv("USUARIO")
-    senha = os.getenv("SENHA")
-
-    client = mqtt.Client()
-    client.username_pw_set(usuario, senha)
-    client.connect(broker, porta, 60)
-    client.publish("cm/ar/"+endereco+"/cmd", json.dumps(payload))
-    client.disconnect()
+    return mqtt_service_client.publicar_comando_ar(
+        atuador=endereco,
+        payload=payload
+    )
 
 def get_db():
     return MySQLdb.connect(
@@ -485,13 +520,24 @@ def enviar_comando_ar(ar_cadastrado_id):
             }), 400
 
         vetor = json.loads(dados["comando_valor"])
-        print(len(vetor))   
+        # print(len(vetor))   
+
+        print(comando_nome.casefold())
+        referencia=0
+        if(comando_nome.casefold() == "desligar"):
+            cmdType = "desligar"
+        elif (comando_nome.casefold().split()[0]=="ligar"):
+            cmdType = "ligar"
+            referencia = comando_nome.split()[1]
+
         payload = {
             # "ar_id": dados["ar_id"],
             # "comando_id": dados["comando_id"],
             # "comando_nome": dados["comando_nome"],
             "irCmd": vetor,#dados["comando_valor"],
-            "length": len(vetor)
+            "length": len(vetor),
+            "cmdType": cmdType,
+            "ref": referencia
         }
 
         endereco_atuador = dados["atuador"]
@@ -782,6 +828,20 @@ def listar_ar_cadastrados():
             """
         )
 
+        for ar in resultado:
+            arStatus = redis.consultar_estado_dispositivo(ar["id"])
+            if(arStatus != None):
+
+                ar["temperatura_medida"] = arStatus["temperatura_medida"]
+                ar["status"] = "ligado" if arStatus["power"] else "desligado"
+
+            else:
+                ar["status"]                = "desconhecido"
+                ar["temperatura_medida"]    = "desconhecido"
+            print("vamos q vamos %s", ar["id"])
+            print(arStatus)
+
+
         return jsonify({
             "status": "ok",
             "dados": resultado
@@ -798,7 +858,214 @@ def acionar_comando(ar_cadastrado_id):
     data = request.json
 
     comando = request.json["comando"]
+
+@app.post("/internal/mqtt/status")
+def registrar_status_mqtt():
+    dados = request.get_json(silent=True)
+    
+    if not isinstance(dados, dict):
+        return jsonify({
+            "erro": "Corpo da requisição deve ser um JSON"
+        }), 400
+
+    # print(dados)
+
+    sql = """
+        SELECT
+            ac.id AS ar_cadastrado_id,
+            s.id AS sala_id
+        FROM ar_cadastrados ac
+        INNER JOIN salas s
+            ON s.id = ac.sala
+        WHERE ac.atuador = %s;
+        """
+
+    device = dados.get("device")
+    state = dados.get("state")
+    sensors = dados.get("sensors")
+    diagnostics = dados.get("diagnostics")
+    statistics = dados.get("statistics")
+
+    if not device:
+        return jsonify({
+            "erro": "O campo atuador é obrigatório"
+        }), 400
+
+    try:
+        r = executar_select(sql, (device.get("id"),),)
+        sala_condicionador = r[0]
+
+    except Exception as erro:
+        app.logger.exception("Erro ao registrar status MQTT")
+
+        return jsonify({
+            "erro": "Não foi possível registrar o status"
+        }), 500
+
+    ar_cadastrado_id = sala_condicionador.get("ar_cadastrado_id")
+    sala_id = sala_condicionador.get("sala_id")
+
+    redis.atualizar_estado_dispositivo(
+        ar_cadastrado_id,
+        sala_id, 
+        dados
+    )
+
+    emitir_status_ar(
+        ar_cadastrado_id=ar_cadastrado_id,
+        sala_id=sala_id,
+        dados=dados,
+    )
+
+    print("statistics: ")
+    print(statistics)
+
+
+    # print("**************************************************")
+    # print(redis.consultar_estado_dispositivo(device["id"]))
+
+    return jsonify({
+                "mensagem": "Status registrado",
+                "resultado": sala_condicionador
+            }), 201
+
+    try:
+        # Substitua pela função que já utiliza para acessar o banco.
+        resultado = salvar_status_no_banco(
+            device=device,
+            state=state,
+            sensors=sensors,
+            diagnostics=diagnostics,
+            statistics=statistics
+        )
+
+        return jsonify({
+            "mensagem": "Status registrado",
+            "resultado": resultado
+        }), 201
+
+    except Exception as erro:
+        app.logger.exception("Erro ao registrar status MQTT")
+
+        return jsonify({
+            "erro": "Não foi possível registrar o status"
+        }), 500
+
+@app.post("/internal/mqtt/availability")
+def registrar_availability():
+    dados = request.get_json(silent=True)
     
 
+    if not isinstance(dados, dict):
+        return jsonify({
+            "erro": "Corpo da requisição deve ser um JSON"
+        }), 400
+
+    print(dados)
+    device_id = dados.get("atuador")
+
+    sql = """
+        SELECT
+            ac.id AS ar_cadastrado_id,
+            s.id AS sala_id
+        FROM ar_cadastrados ac
+        INNER JOIN salas s
+            ON s.id = ac.sala
+        WHERE ac.atuador = %s;
+        """
+
+    try:
+        r = executar_select(sql, (device_id,),)
+        sala_condicionador = r[0]
+
+    except Exception as erro:
+        app.logger.exception("Erro ao registrar status MQTT")
+
+        return jsonify({
+            "erro": "Não foi possível registrar o status"
+        }), 500
+
+    print(sala_condicionador)
+    ar_id = sala_condicionador.get("ar_cadastrado_id")
+    sala_id = sala_condicionador.get("sala_id")
+    redis.atualizar_online_offline(ar_id, sala_id, device_id, dados.get("online"))
+
+    return jsonify({
+            "mensagem": "Status registrado"
+        }), 200
+
+
+@app.route("/status-ar/<int:ar_cadastrado_id>", methods=["GET"])
+def enviar_status_ar(ar_cadastrado_id):
+
+    resposta = redis.consultar_estado_dispositivo(ar_cadastrado_id)
+    print(resposta)
+
+    return jsonify({
+            "status": "ok",
+            "resultado": resposta
+        }), 201
+
+@app.route("/status-all-ar", methods=["GET"])
+def enviar_status_all_ar():
+
+    dados = redis.get_data_all_ars()
+
+    return jsonify({
+        "status": "ok",
+        "mensagem": "get ars",
+        "data": dados
+    })
+
+@app.get("/teste-socket")
+def teste_socket():
+
+    ar_cadastrado_id =1
+    sala_id = 10
+    dados={
+        "device": {
+            "id": "dispositivo-teste"
+        },
+        "state": {
+            "power": True
+        },
+        "sensors": {
+            "temperature": 23.5
+        },
+        "diagnostics": {
+            "RSSI": -52
+        },
+        "statistics": {
+            "tempo_ligado": 120
+        },
+        "atuador": "atuador-teste",
+        "topico": "teste/socket"
+    }
+
+    # emitir_status_ar(
+    #     ar_cadastrado_id=ar_cadastrado_id,
+    #     sala_id=sala_id,
+    #     dados=dados
+    # )
+
+    emitir_status_all_ar(
+        ar_cadastrado_id=ar_cadastrado_id,
+        sala_id=sala_id,
+        socketIO_sala="dashboard",
+        dados=dados
+    )
+
+    return jsonify({
+        "status": "ok",
+        "mensagem": "Evento emitido"
+    })
+
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    # app.run(debug=True)
+    socketio.run(
+        app,
+        host="0.0.0.0",
+        port=5000,
+        debug=True
+    )
