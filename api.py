@@ -531,6 +531,8 @@ def lista_salas():
         return {"status": "ok", "dados": resultado}
 
     except Exception as erro:
+        import traceback
+        traceback.print_exc()
         return {"status": "erro", "mensagem": str(erro)}
 
 @app.route("/getAddFomrArData", methods=["GET"])
