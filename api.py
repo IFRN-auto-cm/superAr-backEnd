@@ -11,6 +11,16 @@ import json
 import re
 import redisAccess as redis
 from mySocketio import init_socketio, emitir_status_ar, socketio, emitir_status_all_ar
+# Importando o models
+from sqlalchemy import select
+from database import SessionLocal
+from models.models import (
+    Comandos,
+    ModelosMarcas,
+    Salas,
+    ArCadastrados,
+    ModelosMarcasComando,
+)
 
 app = Flask(__name__)
 CORS(app)
@@ -260,26 +270,62 @@ def deletar_marcaModelo(marcaModelo_id):
             "mensagem": str(erro)
         }), 500
 
+#Rota comandos "migrada"
 @app.route("/comandos", methods=["POST"])
 def inserir_comando():
     data = request.json
-
-    # return jsonify({"status": "ok", "id": 1})
     nome = data.get("nome")
-
     nome = normalizar(nome)
-
+    
     if not nome:
-        return jsonify({"status": "erro", "mensagem": "nome é obrigatório"}), 400
+        return jsonify({
+            "status": "erro",
+            "mensagem": "nome é obrigatório"
+        }), 400
 
-    sql = "insert into comandos (nome) values ('"+nome+"');"
-    # return jsonify({"status": "ok", "id": 1})
     try:
-        novo_id = executar_insert(sql)
-        return jsonify({"status": "ok", "id": novo_id})
+        with SessionLocal() as session:
+            novo_comando = Comandos(
+                nome=nome
+            )
+
+            session.add(novo_comando)
+            session.commit()
+            session.refresh(novo_comando)
+
+            novo_id = novo_comando.id
+
+        return jsonify({
+            "status": "ok",
+            "id": novo_id
+        })
 
     except Exception as erro:
-        return jsonify({"status": "erro", "mensagem": str(erro)}), 500
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(erro)
+        }), 500
+
+# @app.route("/comandos", methods=["POST"])
+# def inserir_comando():
+#     data = request.json
+#
+#     # return jsonify({"status": "ok", "id": 1})
+#     nome = data.get("nome")
+#
+#     nome = normalizar(nome)
+#
+#     if not nome:
+#         return jsonify({"status": "erro", "mensagem": "nome é obrigatório"}), 400
+#
+#     sql = "insert into comandos (nome) values ('"+nome+"');"
+#     # return jsonify({"status": "ok", "id": 1})
+#     try:
+#         novo_id = executar_insert(sql)
+#         return jsonify({"status": "ok", "id": novo_id})
+#
+#     except Exception as erro:
+#         return jsonify({"status": "erro", "mensagem": str(erro)}), 500
 
 @app.route("/modelos-marcas", methods=["POST"])
 def inserir_modelo_marca():
@@ -1071,3 +1117,26 @@ if __name__ == '__main__':
         port=5000,
         debug=True
     )
+
+# Rotas temporárias:
+
+from sqlalchemy import text
+from database import engine
+
+
+@app.route("/teste-sqlalchemy")
+def teste_sqlalchemy():
+    try:
+        with engine.connect() as conn:
+            resultado = conn.execute(text("SELECT 1")).scalar()
+
+        return jsonify({
+            "status": "ok",
+            "sqlalchemy": resultado
+        })
+
+    except Exception as erro:
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(erro)
+        }), 500
