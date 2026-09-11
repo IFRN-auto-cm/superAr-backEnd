@@ -12,7 +12,7 @@ import re
 import redisAccess as redis
 from mySocketio import init_socketio, emitir_status_ar, socketio, emitir_status_all_ar
 # Importando o models
-from sqlalchemy import select
+from sqlalchemy import select, case
 from database import SessionLocal
 from models.models import (
     Comandos,
@@ -214,22 +214,24 @@ def executar_update(sql, valores=None):
         cursor.close()
         conn.close()
 
+# =========================
+# ROTAS - SQLAlchemy
+# =========================
+
 @app.route("/comandos/<int:comando_id>", methods=["DELETE"])
 def deletar_comando(comando_id):
     try:
-        linhas_afetadas = executar_delete(
-            """
-            DELETE FROM comandos
-            WHERE id = %s
-            """,
-            (comando_id,),
-        )
+        with SessionLocal() as session:
+            comando = session.get(Comandos, comando_id)
 
-        if linhas_afetadas == 0:
-            return jsonify({
-                "status": "erro",
-                "mensagem": "comando não encontrado"
-            }), 404
+            if comando is None:
+                return jsonify({
+                    "status": "erro",
+                    "mensagem": "comando não encontrado"
+                }), 404
+
+            session.delete(comando)
+            session.commit()
 
         return jsonify({
             "status": "ok",
@@ -242,22 +244,21 @@ def deletar_comando(comando_id):
             "mensagem": str(erro)
         }), 500
 
+
 @app.route("/modelos-marcas/<int:marcaModelo_id>", methods=["DELETE"])
 def deletar_marcaModelo(marcaModelo_id):
     try:
-        linhas_afetadas = executar_delete(
-            """
-            DELETE FROM modelos_marcas
-            WHERE id = %s
-            """,
-            (marcaModelo_id,),
-        )
+        with SessionLocal() as session:
+            marca_modelo = session.get(ModelosMarcas, marcaModelo_id)
 
-        if linhas_afetadas == 0:
-            return jsonify({
-                "status": "erro",
-                "mensagem": "comando não encontrado"
-            }), 404
+            if marca_modelo is None:
+                return jsonify({
+                    "status": "erro",
+                    "mensagem": "comando não encontrado"
+                }), 404
+
+            session.delete(marca_modelo)
+            session.commit()
 
         return jsonify({
             "status": "ok",
@@ -273,10 +274,9 @@ def deletar_marcaModelo(marcaModelo_id):
 #Rota comandos "migrada"
 @app.route("/comandos", methods=["POST"])
 def inserir_comando():
-    data = request.json
-    nome = data.get("nome")
-    nome = normalizar(nome)
-    
+    data = request.json or {}
+    nome = normalizar(data.get("nome", ""))
+
     if not nome:
         return jsonify({
             "status": "erro",
@@ -285,14 +285,10 @@ def inserir_comando():
 
     try:
         with SessionLocal() as session:
-            novo_comando = Comandos(
-                nome=nome
-            )
-
+            novo_comando = Comandos(nome=nome)
             session.add(novo_comando)
             session.commit()
             session.refresh(novo_comando)
-
             novo_id = novo_comando.id
 
         return jsonify({
@@ -306,89 +302,82 @@ def inserir_comando():
             "mensagem": str(erro)
         }), 500
 
-# @app.route("/comandos", methods=["POST"])
-# def inserir_comando():
-#     data = request.json
-#
-#     # return jsonify({"status": "ok", "id": 1})
-#     nome = data.get("nome")
-#
-#     nome = normalizar(nome)
-#
-#     if not nome:
-#         return jsonify({"status": "erro", "mensagem": "nome é obrigatório"}), 400
-#
-#     sql = "insert into comandos (nome) values ('"+nome+"');"
-#     # return jsonify({"status": "ok", "id": 1})
-#     try:
-#         novo_id = executar_insert(sql)
-#         return jsonify({"status": "ok", "id": novo_id})
-#
-#     except Exception as erro:
-#         return jsonify({"status": "erro", "mensagem": str(erro)}), 500
 
 @app.route("/modelos-marcas", methods=["POST"])
 def inserir_modelo_marca():
-    data = request.json
+    data = request.json or {}
 
     marca = data.get("marca")
     modelo = data.get("modelo")
 
     if not marca or not modelo:
-        return jsonify({"status": "erro", "mensagem": "marca e modelo são obrigatórios"}), 400
+        return jsonify({
+            "status": "erro",
+            "mensagem": "marca e modelo são obrigatórios"
+        }), 400
 
-    sql = "INSERT INTO modelos_marcas (marca, modelo) VALUES ('" + marca + "','" + modelo + "')"
-    print(sql)
     try:
-        novo_id = executar_insert(sql)
+        with SessionLocal() as session:
+            novo = ModelosMarcas(
+                marca=marca,
+                modelo=modelo
+            )
+            session.add(novo)
+            session.commit()
+            session.refresh(novo)
+            novo_id = novo.id
 
-        return jsonify({"status": "ok", "id": novo_id})
+        return jsonify({
+            "status": "ok",
+            "id": novo_id
+        })
 
     except Exception as erro:
-        return jsonify({"status": "erro", "mensagem": str(erro)}), 500
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(erro)
+        }), 500
+
 
 @app.route("/modelos-marcas-comandos", methods=["POST"])
 def associar_modelo_comando():
-    data = request.json
+    data = request.json or {}
 
     modelo_marcas = data.get("modelo_marcas")
     comandos = data.get("comandos")
-    # comando_valor = data.get("comando_valor")
-    print(comandos)
+
     if not modelo_marcas or not comandos:
-        return jsonify({"status": "erro", "mensagem": "modelo_marcas e pelo menos 1 comando são obrigatórios"}), 400
+        return jsonify({
+            "status": "erro",
+            "mensagem": "modelo_marcas e pelo menos 1 comando são obrigatórios"
+        }), 400
 
     try:
+        with SessionLocal() as session:
+            valores = [
+                ModelosMarcasComando(
+                    modelo_marcas=modelo_marcas,
+                    comando=comando["id"],
+                    comando_valor=str(comando["valor"])
+                )
+                for comando in comandos
+            ]
 
-        valores = [
-            (
-                modelo_marcas,
-                comando["id"],
-                str(comando["valor"])
-                # "teste"
-            )
-            for comando in comandos
-        ]
-
-        sql = """
-            INSERT INTO modelosMarcas_comando
-            (modelo_marcas, comando, comando_valor)
-            VALUES (%s, %s, %s)
-        """
-        # novo_id = executar_insert(sql)
-        print("valores")
-        print(valores)
-
-        executar_insert_many(sql, valores)
+            session.add_all(valores)
+            session.commit()
 
         return jsonify({"status": "ok"})
 
     except Exception as erro:
-        return jsonify({"status": "erro", "mensagem": str(erro)}), 500
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(erro)
+        }), 500
+
 
 @app.route("/ar-cadastrados", methods=["POST"])
 def inserir_ar_cadastrado():
-    data = request.json
+    data = request.json or {}
 
     # temperatura_medida = data.get("temperatura_medida")
     temperatura_referencia = data.get("temperatura_referencia")
@@ -399,85 +388,29 @@ def inserir_ar_cadastrado():
     sala = data.get("sala")
 
     if not modelo_marca:
-        return jsonify({"status": "erro", "mensagem": "modelo_marca é obrigatório"}), 400
-
-    try:
-        novo_id = executar_insert(
-            """
-            INSERT INTO ar_cadastrados
-            (temperatura_referencia, modelo_marca, status, atuador, nome, sala)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            """,
-            (
-                temperatura_referencia,
-                modelo_marca,
-                status,
-                atuador,
-                nome,
-                sala,
-            ),
-        )
-
-        return jsonify({"status": "ok", "id": novo_id})
-
-    except Exception as erro:
-        return jsonify({"status": "erro", "mensagem": str(erro)}), 500
-
-@app.route("/ar-cadastrados/<int:ar_cadastrado_id>", methods=["POST"])
-def update_ar_cadastrado(ar_cadastrado_id):
-    data = request.json
-
-    temperatura_medida = 0#data.get("temperatura_medida")
-    temperatura_referencia = data.get("temperatura_referencia")
-    modelo_marca = data.get("marcaModeloId")
-    status = data.get("status")
-    atuador = data.get("atuador")
-    nome = data.get("nome")
-    sala = data.get("sala")
-
-    print(ar_cadastrado_id);
-    print(data);
-
-    if not modelo_marca:
         return jsonify({
             "status": "erro",
             "mensagem": "modelo_marca é obrigatório"
         }), 400
-    if not sala:
-        return jsonify({
-            "status": "erro",
-            "mensagem": "sala é obrigatória"
-        }), 400
 
     try:
-        linhas_afetadas = executar_update(
-            """
-            UPDATE ar_cadastrados
-            SET
-                temperatura_medida = %s,
-                temperatura_referencia = %s,
-                modelo_marca = %s,
-                status = %s,
-                atuador = %s,
-                nome = %s,
-                sala = %s
-            WHERE id = %s
-            """,
-            (
-                temperatura_medida,
-                temperatura_referencia,
-                modelo_marca,
-                status,
-                atuador,
-                nome,
-                sala,
-                ar_cadastrado_id,
-            ),
-        )
+        with SessionLocal() as session:
+            novo = ArCadastrados(
+                temperatura_referencia=temperatura_referencia,
+                modelo_marca=modelo_marca,
+                status=status,
+                atuador=atuador,
+                nome=nome,
+                sala=sala
+            )
+            session.add(novo)
+            session.commit()
+            session.refresh(novo)
+            novo_id = novo.id
 
         return jsonify({
             "status": "ok",
-            "linhas_afetadas": linhas_afetadas
+            "id": novo_id
         })
 
     except Exception as erro:
@@ -486,9 +419,66 @@ def update_ar_cadastrado(ar_cadastrado_id):
             "mensagem": str(erro)
         }), 500
 
+
+@app.route("/ar-cadastrados/<int:ar_cadastrado_id>", methods=["POST"])
+def update_ar_cadastrado(ar_cadastrado_id):
+    data = request.json or {}
+
+    temperatura_medida = 0
+    temperatura_referencia = data.get("temperatura_referencia")
+    modelo_marca = data.get("marcaModeloId")
+    status = data.get("status")
+    atuador = data.get("atuador")
+    nome = data.get("nome")
+    sala = data.get("sala")
+
+    if not modelo_marca:
+        return jsonify({
+            "status": "erro",
+            "mensagem": "modelo_marca é obrigatório"
+        }), 400
+
+    if not sala:
+        return jsonify({
+            "status": "erro",
+            "mensagem": "sala é obrigatória"
+        }), 400
+
+    try:
+        with SessionLocal() as session:
+            ar = session.get(ArCadastrados, ar_cadastrado_id)
+
+            if ar is None:
+                return jsonify({
+                    "status": "ok",
+                    "linhas_afetadas": 0
+                })
+
+            ar.temperatura_medida = temperatura_medida
+            ar.temperatura_referencia = temperatura_referencia
+            ar.modelo_marca = modelo_marca
+            ar.status = status
+            ar.atuador = atuador
+            ar.nome = nome
+            ar.sala = sala
+
+            session.commit()
+
+        return jsonify({
+            "status": "ok",
+            "linhas_afetadas": 1
+        })
+
+    except Exception as erro:
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(erro)
+        }), 500
+
+
 @app.route("/salas", methods=["POST"])
 def inserir_sala():
-    data = request.json
+    data = request.json or {}
 
     nome = data.get("nome")
     predio = data.get("predio")
@@ -499,27 +489,42 @@ def inserir_sala():
     ar4 = data.get("ar4")
 
     if not nome:
-        return jsonify({"status": "erro", "mensagem": "nome é obrigatório"}), 400
+        return jsonify({
+            "status": "erro",
+            "mensagem": "nome é obrigatório"
+        }), 400
 
     try:
-        novo_id = executar_insert(
-            """
-            INSERT INTO salas
-            (nome, predio, numero_de_ar, ar1, ar2, ar3, ar4)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """,
-            (nome, predio, numero_de_ar, ar1, ar2, ar3, ar4),
-        )
+        with SessionLocal() as session:
+            nova_sala = Salas(
+                nome=nome,
+                predio=predio,
+                numero_de_ar=numero_de_ar,
+                ar1=ar1,
+                ar2=ar2,
+                ar3=ar3,
+                ar4=ar4
+            )
+            session.add(nova_sala)
+            session.commit()
+            session.refresh(nova_sala)
+            novo_id = nova_sala.id
 
-        return jsonify({"status": "ok", "id": novo_id})
+        return jsonify({
+            "status": "ok",
+            "id": novo_id
+        })
 
     except Exception as erro:
-        return jsonify({"status": "erro", "mensagem": str(erro)}), 500
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(erro)
+        }), 500
+
 
 @app.route("/ar-cadastrados/<int:ar_cadastrado_id>/enviar-comando", methods=["POST"])
 def enviar_comando_ar(ar_cadastrado_id):
-    
-    data = request.json   
+    data = request.json or {}
     comando_nome = data.get("comando_nome")
 
     if not comando_nome:
@@ -529,65 +534,66 @@ def enviar_comando_ar(ar_cadastrado_id):
         }), 400
 
     try:
-        # resultado = []
-        resultado = executar_select(
-            """
-            SELECT
-                ar.id AS ar_id,
-                ar.nome AS ar_nome,
-                ar.atuador,
-                ar.modelo_marca,
-                c.id AS comando_id,
-                c.nome AS comando_nome,
-                mmc.comando_valor
-            FROM ar_cadastrados ar
-            INNER JOIN modelosMarcas_comando mmc
-                ON mmc.modelo_marcas = ar.modelo_marca
-            INNER JOIN comandos c
-                ON c.id = mmc.comando
-            WHERE ar.id = %s
-              AND c.nome = %s
-            """,
-            (ar_cadastrado_id, comando_nome)
-        )
+        with SessionLocal() as session:
+            stmt = (
+                select(
+                    ArCadastrados.id.label("ar_id"),
+                    ArCadastrados.nome.label("ar_nome"),
+                    ArCadastrados.atuador,
+                    ArCadastrados.modelo_marca,
+                    Comandos.id.label("comando_id"),
+                    Comandos.nome.label("comando_nome"),
+                    ModelosMarcasComando.comando_valor
+                )
+                .join(
+                    ModelosMarcasComando,
+                    ModelosMarcasComando.modelo_marcas == ArCadastrados.modelo_marca
+                )
+                .join(
+                    Comandos,
+                    Comandos.id == ModelosMarcasComando.comando
+                )
+                .where(
+                    ArCadastrados.id == ar_cadastrado_id,
+                    Comandos.nome == comando_nome
+                )
+            )
 
-        if len(resultado) == 0:
-            return jsonify({
-                "status": "erro",
-                "mensagem": "Comando não cadastrado para o modelo deste ar-condicionado"
-            }), 404
+            dados = session.execute(stmt).mappings().first()
 
-        dados = resultado[0]
+            if dados is None:
+                return jsonify({
+                    "status": "erro",
+                    "mensagem": "Comando não cadastrado para o modelo deste ar-condicionado"
+                }), 404
 
-        if not dados["atuador"]:
-            return jsonify({
-                "status": "erro",
-                "mensagem": "Este ar-condicionado não possui atuador cadastrado"
-            }), 400
+            if not dados["atuador"]:
+                return jsonify({
+                    "status": "erro",
+                    "mensagem": "Este ar-condicionado não possui atuador cadastrado"
+                }), 400
 
-        vetor = json.loads(dados["comando_valor"])
-        # print(len(vetor))   
+            vetor = json.loads(dados["comando_valor"])
 
-        print(comando_nome.casefold())
-        referencia=0
-        if(comando_nome.casefold() == "desligar"):
-            cmdType = "desligar"
-        elif (comando_nome.casefold().split()[0]=="ligar"):
-            cmdType = "ligar"
+        referencia = 0
+        partes = comando_nome.casefold().split()
+
+        if comando_nome.casefold() == "desligar":
+            cmd_type = "desligar"
+        elif partes and partes[0] == "ligar":
+            cmd_type = "ligar"
             referencia = comando_nome.split()[1]
+        else:
+            cmd_type = comando_nome.casefold()
 
         payload = {
-            # "ar_id": dados["ar_id"],
-            # "comando_id": dados["comando_id"],
-            # "comando_nome": dados["comando_nome"],
-            "irCmd": vetor,#dados["comando_valor"],
+            "irCmd": vetor,
             "length": len(vetor),
-            "cmdType": cmdType,
+            "cmdType": cmd_type,
             "ref": referencia
         }
 
         endereco_atuador = dados["atuador"]
-
         publicar_mqtt(endereco_atuador, payload)
 
         return jsonify({
@@ -603,78 +609,103 @@ def enviar_comando_ar(ar_cadastrado_id):
             "mensagem": str(erro)
         }), 500
 
-@app.route("/salas", methods=["GET"])
-def api_lista_salas():
-    salas = lista_salas()
-    if(salas["status"]=="ok"):
-        return jsonify(salas)
-    return jsonify(salas), 500
 
 def lista_salas():
     try:
-        resultado = executar_select(
-            """
-            SELECT id, nome, codigo, predio
-            FROM salas
-            ORDER BY codigo, nome
-            """
-        )
+        with SessionLocal() as session:
+            stmt = (
+                select(
+                    Salas.id,
+                    Salas.nome,
+                    Salas.codigo,
+                    Salas.predio
+                )
+                .order_by(Salas.codigo, Salas.nome)
+            )
+            resultado = session.execute(stmt).mappings().all()
 
-        return {"status": "ok", "dados": resultado}
+        return {
+            "status": "ok",
+            "dados": [dict(row) for row in resultado]
+        }
 
     except Exception as erro:
         import traceback
         traceback.print_exc()
-        return {"status": "erro", "mensagem": str(erro)}
+        return {
+            "status": "erro",
+            "mensagem": str(erro)
+        }
+
+
+@app.route("/salas", methods=["GET"])
+def api_lista_salas():
+    salas = lista_salas()
+
+    if salas["status"] == "ok":
+        return jsonify(salas)
+
+    return jsonify(salas), 500
+
 
 @app.route("/getAddFomrArData", methods=["GET"])
 def getDataToAddFormAr():
     salas = lista_salas()
     marca_modelo = listar_modelos_marcas()
 
-    if(salas["status"] != "ok"):
-        return jsonify(salas), 500;
-    if(marca_modelo["status"] != "ok"):
-        return jsonify(marca_modelo), 500;
+    if salas["status"] != "ok":
+        return jsonify(salas), 500
 
-    return jsonify({"status": "ok", "salas": salas["dados"], "marcaModelo": marca_modelo["dados"]})
+    if marca_modelo["status"] != "ok":
+        return jsonify(marca_modelo), 500
+
+    return jsonify({
+        "status": "ok",
+        "salas": salas["dados"],
+        "marcaModelo": marca_modelo["dados"]
+    })
+
 
 @app.route("/getEditFomrArData/<int:Ar_id>", methods=["GET"])
 def getDataToEditFormAr(Ar_id):
     salas = lista_salas()
     marca_modelo = listar_modelos_marcas()
 
-    if(salas["status"] != "ok"):
-        return jsonify(salas), 500;
-    if(marca_modelo["status"] != "ok"):
-        return jsonify(marca_modelo), 500;
+    if salas["status"] != "ok":
+        return jsonify(salas), 500
 
-    print(Ar_id)
+    if marca_modelo["status"] != "ok":
+        return jsonify(marca_modelo), 500
 
     try:
-        resultado = executar_select(
-            """
-            SELECT
-                ar.id,
-                ar.nome AS nome_ar,
-                ar.temperatura_referencia,
-                s.nome AS sala_nome,
-                s.id as sala_id,
-                mm.id as mm_id,
-                mm.marca,
-                mm.modelo,
-                ar.atuador
-            FROM ar_cadastrados ar
-            LEFT JOIN salas s
-                ON ar.sala = s.id
-            LEFT JOIN modelos_marcas mm
-                ON ar.modelo_marca = mm.id
-            WHERE ar.id = %s
-            """,
-            str(Ar_id)
-        )
+        with SessionLocal() as session:
+            stmt = (
+                select(
+                    ArCadastrados.id,
+                    ArCadastrados.nome.label("nome_ar"),
+                    ArCadastrados.temperatura_referencia,
+                    Salas.nome.label("sala_nome"),
+                    Salas.id.label("sala_id"),
+                    ModelosMarcas.id.label("mm_id"),
+                    ModelosMarcas.marca,
+                    ModelosMarcas.modelo,
+                    ArCadastrados.atuador
+                )
+                .outerjoin(Salas, ArCadastrados.sala == Salas.id)
+                .outerjoin(
+                    ModelosMarcas,
+                    ArCadastrados.modelo_marca == ModelosMarcas.id
+                )
+                .where(ArCadastrados.id == Ar_id)
+            )
 
-        resultado = { "editAr": resultado, "salas": salas["dados"], "marcasModelos": marca_modelo["dados"]}
+            resultado = session.execute(stmt).mappings().all()
+
+        resultado = {
+            "editAr": [dict(row) for row in resultado],
+            "salas": salas["dados"],
+            "marcasModelos": marca_modelo["dados"]
+        }
 
         return jsonify({
             "status": "ok",
@@ -687,208 +718,257 @@ def getDataToEditFormAr(Ar_id):
             "mensagem": str(erro)
         }), 500
 
+
 @app.route("/updateModelosComando", methods=["POST"])
 def updateModelosComando():
-    conn = get_db()
-    cursor = conn.cursor()
+    data = request.json or {}
+
     try:
-        data = request.json
         marca = data["marcaValue"]
         modelo = data["modeloValue"]
         modelo_marcas_id = data["mmId"]
         comandos = data["comandos"]
 
-        cursor.execute("START TRANSACTION")
-        c_id = comandos[0]["id"]
-        c_valor = "".join(str(comandos[0]["valor"]))
+        with SessionLocal() as session:
+            modelo_marca = session.get(ModelosMarcas, modelo_marcas_id)
 
-        cursor.execute(
-            """
-            UPDATE modelos_marcas
-            SET marca = %s, modelo = %s
-            WHERE id = %s
-            """, 
-            (marca, modelo, modelo_marcas_id))
+            if modelo_marca is None:
+                return jsonify({
+                    "status": "erro",
+                    "mensagem": "modelo/marca não encontrado"
+                }), 404
 
-        for comando in comandos:
-            comando_id = comando["id"]
-            comando_valor = comando["valor"]
+            modelo_marca.marca = marca
+            modelo_marca.modelo = modelo
 
-            if comando_valor is None: #or comando_valor.strip() == ""
-                cursor.execute("""
-                    DELETE FROM modelosMarcas_comando
-                    WHERE modelo_marcas = %s
-                    AND comando = %s
-                """, (modelo_marcas_id, comando_id))
-            else:
-                cursor.execute(
-                    """
-                    INSERT INTO modelosMarcas_comando
-                        (modelo_marcas, comando, comando_valor)
-                    VALUES
-                        (%s, %s, %s)
-                    ON DUPLICATE KEY UPDATE
-                        comando_valor = VALUES(comando_valor)
-                    """,
-                    (modelo_marcas_id, comando_id, "".join(str(comando_valor)) ))
+            for comando in comandos:
+                comando_id = comando["id"]
+                comando_valor = comando.get("valor")
 
-        conn.commit()
+                stmt = (
+                    select(ModelosMarcasComando)
+                    .where(
+                        ModelosMarcasComando.modelo_marcas == modelo_marcas_id,
+                        ModelosMarcasComando.comando == comando_id
+                    )
+                )
+                associacao = session.execute(stmt).scalar_one_or_none()
 
-        print(data)
+                if comando_valor is None:
+                    if associacao is not None:
+                        session.delete(associacao)
+                else:
+                    valor = "".join(str(comando_valor))
+
+                    if associacao is None:
+                        associacao = ModelosMarcasComando(
+                            modelo_marcas=modelo_marcas_id,
+                            comando=comando_id,
+                            comando_valor=valor
+                        )
+                        session.add(associacao)
+                    else:
+                        associacao.comando_valor = valor
+
+            session.commit()
+
         return jsonify({"status": "ok"})
 
     except Exception as erro:
-        conn.rollback()
-        return jsonify({"status": "erro", "mensagem": str(erro)}), 500
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(erro)
+        }), 500
+
+
+def listar_modelos_marcas():
+    try:
+        with SessionLocal() as session:
+            stmt = (
+                select(
+                    ModelosMarcas.id,
+                    ModelosMarcas.marca,
+                    ModelosMarcas.modelo
+                )
+                .order_by(ModelosMarcas.marca, ModelosMarcas.modelo)
+            )
+            resultado = session.execute(stmt).mappings().all()
+
+        return {
+            "status": "ok",
+            "dados": [dict(row) for row in resultado]
+        }
+
+    except Exception as erro:
+        return {
+            "status": "erro",
+            "mensagem": str(erro)
+        }
+
 
 @app.route("/modelos-marcas", methods=["GET"])
 def api_listar_modelos_marcas():
     valor = listar_modelos_marcas()
-    if(valor["status"]=="ok"):
+
+    if valor["status"] == "ok":
         return jsonify(valor)
+
     return jsonify(valor), 500
 
-def listar_modelos_marcas():
-    try:
-        resultado = executar_select(
-            """
-            SELECT id, marca, modelo
-            FROM modelos_marcas
-            ORDER BY marca, modelo
-            """
-        )
-
-        return {"status": "ok", "dados": resultado}
-
-    except Exception as erro:
-        return {"status": "erro", "mensagem": str(erro)}
 
 @app.route("/edite-modelos-marcas/<int:modelo_marca_id>", methods=["GET"])
 def listar_modelos_marcas1(modelo_marca_id):
-    resultado =""
     try:
-        marcaModelo = executar_select(
-            """
-            SELECT id, marca, modelo
-            FROM modelos_marcas
-            WHERE id=%s
-            ORDER BY marca, modelo
-            """
-            , (modelo_marca_id,),
-        )       
+        with SessionLocal() as session:
+            marca_stmt = (
+                select(
+                    ModelosMarcas.id,
+                    ModelosMarcas.marca,
+                    ModelosMarcas.modelo
+                )
+                .where(ModelosMarcas.id == modelo_marca_id)
+                .order_by(ModelosMarcas.marca, ModelosMarcas.modelo)
+            )
+            marca_modelo = session.execute(marca_stmt).mappings().first()
+
+            if marca_modelo is None:
+                return jsonify({
+                    "status": "erro",
+                    "mensagem": "modelo/marca não encontrado"
+                }), 404
+
+            cadastrado = case(
+                (ModelosMarcasComando.id.is_(None), False),
+                else_=True
+            ).label("cadastrado_no_modelo")
+
+            comandos_stmt = (
+                select(
+                    Comandos.id.label("comando_id"),
+                    Comandos.nome.label("comando_nome"),
+                    cadastrado
+                )
+                .outerjoin(
+                    ModelosMarcasComando,
+                    (
+                        (ModelosMarcasComando.comando == Comandos.id)
+                        & (ModelosMarcasComando.modelo_marcas == modelo_marca_id)
+                    )
+                )
+                .order_by(Comandos.nome)
+            )
+
+            comandos = session.execute(comandos_stmt).mappings().all()
+
+        return jsonify({
+            "marcaModelo": dict(marca_modelo),
+            "comandos": [dict(row) for row in comandos],
+            "status": "ok"
+        })
 
     except Exception as erro:
-        return jsonify({"status": "erro", "mensagem": str(erro)}), 500
-    
-    try:
-        comandos = executar_select(
-            """
-            SELECT
-                c.id AS comando_id,
-                c.nome AS comando_nome,
-                CASE
-                    WHEN mmc.id IS NULL THEN false
-                    ELSE true
-                END AS cadastrado_no_modelo
-            FROM comandos c
-            LEFT JOIN modelosMarcas_comando mmc
-                ON mmc.comando = c.id
-            AND mmc.modelo_marcas = %s
-            ORDER BY c.nome;
-            """
-            , (modelo_marca_id,),
-        )
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(erro)
+        }), 500
 
-    except Exception as erro:
-        return jsonify({"status": "erro", "mensagem": str(erro)}), 500
-    
-    resultado = {"marcaModelo": marcaModelo[0], "comandos": comandos, "status": "ok"}
-
-    print(comandos)
-    
-    return jsonify(resultado)
 
 @app.route("/modelos-marcas/<int:modelo_marca_id>/comandos", methods=["GET"])
 def listar_comandos_por_modelo_marca(modelo_marca_id):
     try:
-        resultado = executar_select(
-            """
-            SELECT
-                mmc.id AS associacao_id,
-                mm.id AS modelo_marca_id,
-                mm.marca,
-                mm.modelo,
-                c.id AS comando_id,
-                c.nome AS comando_nome,
-                mmc.comando_valor
-            FROM modelosMarcas_comando mmc
-            INNER JOIN modelos_marcas mm
-                ON mm.id = mmc.modelo_marcas
-            INNER JOIN comandos c
-                ON c.id = mmc.comando
-            WHERE mm.id = %s
-            ORDER BY c.nome
-            """,
-            (modelo_marca_id,),
-        )
+        with SessionLocal() as session:
+            stmt = (
+                select(
+                    ModelosMarcasComando.id.label("associacao_id"),
+                    ModelosMarcas.id.label("modelo_marca_id"),
+                    ModelosMarcas.marca,
+                    ModelosMarcas.modelo,
+                    Comandos.id.label("comando_id"),
+                    Comandos.nome.label("comando_nome"),
+                    ModelosMarcasComando.comando_valor
+                )
+                .join(
+                    ModelosMarcas,
+                    ModelosMarcas.id == ModelosMarcasComando.modelo_marcas
+                )
+                .join(
+                    Comandos,
+                    Comandos.id == ModelosMarcasComando.comando
+                )
+                .where(ModelosMarcas.id == modelo_marca_id)
+                .order_by(Comandos.nome)
+            )
 
-        return jsonify({"status": "ok", "dados": resultado})
+            resultado = session.execute(stmt).mappings().all()
+
+        return jsonify({
+            "status": "ok",
+            "dados": [dict(row) for row in resultado]
+        })
 
     except Exception as erro:
-        return jsonify({"status": "erro", "mensagem": str(erro)}), 500
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(erro)
+        }), 500
+
 
 @app.route("/comandos", methods=["GET"])
 def listar_comandos():
     try:
-        resultado = executar_select(
-            """
-            SELECT id, nome
-            FROM comandos
-            ORDER BY nome
-            """
-        )
+        with SessionLocal() as session:
+            stmt = (
+                select(Comandos.id, Comandos.nome)
+                .order_by(Comandos.nome)
+            )
+            resultado = session.execute(stmt).mappings().all()
 
-        return jsonify({"status": "ok", "dados": resultado})
+        return jsonify({
+            "status": "ok",
+            "dados": [dict(row) for row in resultado]
+        })
 
     except Exception as erro:
-        return jsonify({"status": "erro", "mensagem": str(erro)}), 500
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(erro)
+        }), 500
+
 
 @app.route("/ar-cadastrados", methods=["GET"])
 def listar_ar_cadastrados():
     try:
-        resultado = executar_select(
-            """
-            SELECT
-                ar.id,
-                ar.nome AS nome_ar,
-                ar.temperatura_referencia,
-                s.nome AS sala_nome,
-                s.codigo as sala_cod,
-                mm.marca,
-                mm.modelo,
-                ar.atuador
-            FROM ar_cadastrados ar
-            LEFT JOIN salas s
-                ON ar.sala = s.id
-            LEFT JOIN modelos_marcas mm
-                ON ar.modelo_marca = mm.id
-            ORDER BY s.nome, ar.nome
-            """
-        )
+        with SessionLocal() as session:
+            stmt = (
+                select(
+                    ArCadastrados.id,
+                    ArCadastrados.nome.label("nome_ar"),
+                    ArCadastrados.temperatura_referencia,
+                    Salas.nome.label("sala_nome"),
+                    Salas.codigo.label("sala_cod"),
+                    ModelosMarcas.marca,
+                    ModelosMarcas.modelo,
+                    ArCadastrados.atuador
+                )
+                .outerjoin(Salas, ArCadastrados.sala == Salas.id)
+                .outerjoin(
+                    ModelosMarcas,
+                    ArCadastrados.modelo_marca == ModelosMarcas.id
+                )
+                .order_by(Salas.nome, ArCadastrados.nome)
+            )
+
+            resultado = [dict(row) for row in session.execute(stmt).mappings().all()]
 
         for ar in resultado:
             arStatus = redis.consultar_estado_dispositivo(ar["id"])
-            if(arStatus != None):
 
+            if arStatus is not None:
                 ar["temperatura_medida"] = arStatus["temperatura_medida"]
                 ar["status"] = "ligado" if arStatus["power"] else "desligado"
-
             else:
-                ar["status"]                = "desconhecido"
-                ar["temperatura_medida"]    = "desconhecido"
-            print("vamos q vamos %s", ar["id"])
-            print(arStatus)
-
+                ar["status"] = "desconhecido"
+                ar["temperatura_medida"] = "desconhecido"
 
         return jsonify({
             "status": "ok",
@@ -901,38 +981,38 @@ def listar_ar_cadastrados():
             "mensagem": str(erro)
         }), 500
 
+
 @app.route("/enviar-comando/<int:ar_cadastrado_id>", methods=["GET"])
 def acionar_comando(ar_cadastrado_id):
-    data = request.json
+    data = request.json or {}
+    comando = data.get("comando")
 
-    comando = request.json["comando"]
+    if not comando:
+        return jsonify({
+            "status": "erro",
+            "mensagem": "comando é obrigatório"
+        }), 400
+
+    # Esta rota já existia no arquivo original, mas não possuía
+    # implementação. Mantida sem acesso ao banco.
+    return jsonify({
+        "status": "ok",
+        "mensagem": "Rota ainda sem implementação",
+        "ar_cadastrado_id": ar_cadastrado_id,
+        "comando": comando
+    })
+
 
 @app.post("/internal/mqtt/status")
 def registrar_status_mqtt():
     dados = request.get_json(silent=True)
-    
+
     if not isinstance(dados, dict):
         return jsonify({
             "erro": "Corpo da requisição deve ser um JSON"
         }), 400
 
-    # print(dados)
-
-    sql = """
-        SELECT
-            ac.id AS ar_cadastrado_id,
-            s.id AS sala_id
-        FROM ar_cadastrados ac
-        INNER JOIN salas s
-            ON s.id = ac.sala
-        WHERE ac.atuador = %s;
-        """
-
     device = dados.get("device")
-    state = dados.get("state")
-    sensors = dados.get("sensors")
-    diagnostics = dados.get("diagnostics")
-    statistics = dados.get("statistics")
 
     if not device:
         return jsonify({
@@ -940,123 +1020,114 @@ def registrar_status_mqtt():
         }), 400
 
     try:
-        r = executar_select(sql, (device.get("id"),),)
-        sala_condicionador = r[0]
+        with SessionLocal() as session:
+            stmt = (
+                select(
+                    ArCadastrados.id.label("ar_cadastrado_id"),
+                    Salas.id.label("sala_id")
+                )
+                .join(Salas, Salas.id == ArCadastrados.sala)
+                .where(ArCadastrados.atuador == device.get("id"))
+            )
 
-    except Exception as erro:
-        app.logger.exception("Erro ao registrar status MQTT")
+            sala_condicionador = session.execute(stmt).mappings().first()
 
-        return jsonify({
-            "erro": "Não foi possível registrar o status"
-        }), 500
+            if sala_condicionador is None:
+                return jsonify({
+                    "erro": "Ar-condicionado não encontrado para este atuador"
+                }), 404
 
-    ar_cadastrado_id = sala_condicionador.get("ar_cadastrado_id")
-    sala_id = sala_condicionador.get("sala_id")
+            sala_condicionador = dict(sala_condicionador)
 
-    redis.atualizar_estado_dispositivo(
-        ar_cadastrado_id,
-        sala_id, 
-        dados
-    )
+        ar_cadastrado_id = sala_condicionador["ar_cadastrado_id"]
+        sala_id = sala_condicionador["sala_id"]
 
-    emitir_status_ar(
-        ar_cadastrado_id=ar_cadastrado_id,
-        sala_id=sala_id,
-        dados=dados,
-    )
+        redis.atualizar_estado_dispositivo(
+            ar_cadastrado_id,
+            sala_id,
+            dados
+        )
 
-    print("statistics: ")
-    print(statistics)
-
-
-    # print("**************************************************")
-    # print(redis.consultar_estado_dispositivo(device["id"]))
-
-    return jsonify({
-                "mensagem": "Status registrado",
-                "resultado": sala_condicionador
-            }), 201
-
-    try:
-        # Substitua pela função que já utiliza para acessar o banco.
-        resultado = salvar_status_no_banco(
-            device=device,
-            state=state,
-            sensors=sensors,
-            diagnostics=diagnostics,
-            statistics=statistics
+        emitir_status_ar(
+            ar_cadastrado_id=ar_cadastrado_id,
+            sala_id=sala_id,
+            dados=dados
         )
 
         return jsonify({
             "mensagem": "Status registrado",
-            "resultado": resultado
+            "resultado": sala_condicionador
         }), 201
 
-    except Exception as erro:
+    except Exception:
         app.logger.exception("Erro ao registrar status MQTT")
-
         return jsonify({
             "erro": "Não foi possível registrar o status"
         }), 500
 
+
 @app.post("/internal/mqtt/availability")
 def registrar_availability():
     dados = request.get_json(silent=True)
-    
 
     if not isinstance(dados, dict):
         return jsonify({
             "erro": "Corpo da requisição deve ser um JSON"
         }), 400
 
-    print(dados)
     device_id = dados.get("atuador")
 
-    sql = """
-        SELECT
-            ac.id AS ar_cadastrado_id,
-            s.id AS sala_id
-        FROM ar_cadastrados ac
-        INNER JOIN salas s
-            ON s.id = ac.sala
-        WHERE ac.atuador = %s;
-        """
-
     try:
-        r = executar_select(sql, (device_id,),)
-        sala_condicionador = r[0]
+        with SessionLocal() as session:
+            stmt = (
+                select(
+                    ArCadastrados.id.label("ar_cadastrado_id"),
+                    Salas.id.label("sala_id")
+                )
+                .join(Salas, Salas.id == ArCadastrados.sala)
+                .where(ArCadastrados.atuador == device_id)
+            )
 
-    except Exception as erro:
-        app.logger.exception("Erro ao registrar status MQTT")
+            sala_condicionador = session.execute(stmt).mappings().first()
 
+            if sala_condicionador is None:
+                return jsonify({
+                    "erro": "Ar-condicionado não encontrado para este atuador"
+                }), 404
+
+            ar_id = sala_condicionador["ar_cadastrado_id"]
+            sala_id = sala_condicionador["sala_id"]
+
+        redis.atualizar_online_offline(
+            ar_id,
+            sala_id,
+            device_id,
+            dados.get("online")
+        )
+
+        return jsonify({
+            "mensagem": "Status registrado"
+        }), 200
+
+    except Exception:
+        app.logger.exception("Erro ao registrar availability MQTT")
         return jsonify({
             "erro": "Não foi possível registrar o status"
         }), 500
 
-    print(sala_condicionador)
-    ar_id = sala_condicionador.get("ar_cadastrado_id")
-    sala_id = sala_condicionador.get("sala_id")
-    redis.atualizar_online_offline(ar_id, sala_id, device_id, dados.get("online"))
-
-    return jsonify({
-            "mensagem": "Status registrado"
-        }), 200
-
 
 @app.route("/status-ar/<int:ar_cadastrado_id>", methods=["GET"])
 def enviar_status_ar(ar_cadastrado_id):
-
     resposta = redis.consultar_estado_dispositivo(ar_cadastrado_id)
-    print(resposta)
 
     return jsonify({
-            "status": "ok",
-            "resultado": resposta
-        }), 201
+        "status": "ok",
+        "resultado": resposta
+    }), 201
+
 
 @app.route("/status-all-ar", methods=["GET"])
 def enviar_status_all_ar():
-
     dados = redis.get_data_all_ars()
 
     return jsonify({
@@ -1067,10 +1138,10 @@ def enviar_status_all_ar():
 
 @app.get("/teste-socket")
 def teste_socket():
-
     ar_cadastrado_id =1
     sala_id = 10
-    dados={
+
+    dados ={
         "device": {
             "id": "dispositivo-teste"
         },
