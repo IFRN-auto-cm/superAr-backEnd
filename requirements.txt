@@ -10,3 +10,8 @@ paho-mqtt==2.1.0
 redis==6.4.0
 requests
 simple-websocket
+
+SQLAlchemy==2.0.52
+sqlacodegen==4.0.4
+PyMySQL==1.2.0
+cryptography
