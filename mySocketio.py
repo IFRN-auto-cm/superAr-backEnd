@@ -122,9 +122,7 @@ def inscrever_sala(dados):
 
     join_room(room)
 
-    print(
-        f"Socket {request.sid} entrou na room {room}"
-    )
+    logger.info(f"Socket {request.sid} entrou na room {room}")
 
     socketio.emit(
         "inscricao_confirmada",
@@ -146,6 +144,4 @@ def cancelar_sala(dados):
 
     leave_room(room)
 
-    print(
-        f"Socket {request.sid} saiu da room {room}"
-    )
+    logger.info(f"Socket {request.sid} saiu da room {room}")
