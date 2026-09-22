@@ -11,15 +11,23 @@ NAMESPACE = "/monitoramento"
 EVENTO_STATUS_ATUALIZADO = "status_ar_atualizado"
 
 
-def _origens_permitidas():
-    valor = os.getenv("SOCKETIO_CORS_ORIGINS", "http://localhost:3000")
-    origens = [origem.strip() for origem in valor.split(",") if origem.strip()]
-    return origens or ["http://localhost:3000"]
+def __obter_cors_origins():
+    valor = os.getenv("SOCKETIO_CORS_ORIGINS")
+
+    if valor.strip() == "*":
+        return "*"
+
+    origens = [
+        origem.strip()
+        for origem in valor.split(",")
+        if origem.strip()
+    ]
+
+    return origens
 
 
 socketio = SocketIO(
-    # cors_allowed_origins=_origens_permitidas(),
-    cors_allowed_origins="*",
+    cors_allowed_origins=__obter_cors_origins(),
     async_mode="threading",
     logger=False,
     engineio_logger=False,
