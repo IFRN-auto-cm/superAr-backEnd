@@ -3,11 +3,36 @@ import decimal
 
 from sqlalchemy import DECIMAL, ForeignKeyConstraint, Index, Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from flask_sqlalchemy import SQLAlchemy
 
+db = SQLAlchemy()
 class Base(DeclarativeBase):
     pass
+# Opção 1
+class Campeonato(db.Model):
+    __tablename__ = 'campeonato'
 
+    id = db.Column(db.Integer,
+                   primary_key=True,
+                   autoincrement=True)
 
+    nome = db.Column(db.String(40),
+                     nullable=False)
+
+    pontos= db.Column(db.Integer,
+                      nullable= False)
+
+#Opção 2
+class Campeonato(Base):
+    __tablename__ = 'campeonato'
+    id: Mapped[int] = mapped_column(Integer,
+                                    primary_key=True,
+                                    autoincrement=True)
+
+    nome:Mapped[str] = mapped_column(String(40),
+                                     nullable=False)
+
+    pontos: Mapped[int] = mapped_column(Integer,nullable=False)
 class Comandos(Base):
     __tablename__ = 'comandos'
     __table_args__ = (
