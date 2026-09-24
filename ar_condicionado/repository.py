@@ -4,4 +4,36 @@ from database import (get_db, executar_select, executar_insert,
 
 
 
-
+def executar_update(ar_cadastrado_id,
+    temperatura_medida,
+    temperatura_referencia,
+    modelo_marca,
+    status,
+    atuador,
+    nome,
+    sala): 
+    
+    return executar_update(
+            """
+            UPDATE ar_cadastrados
+            SET
+                temperatura_medida = %s,
+                temperatura_referencia = %s,
+                modelo_marca = %s,
+                status = %s,
+                atuador = %s,
+                nome = %s,
+                sala = %s
+            WHERE id = %s
+            """,
+            (
+                temperatura_medida,
+                temperatura_referencia,
+                modelo_marca,
+                status,
+                atuador,
+                nome,
+                sala,
+                ar_cadastrado_id,
+            ),
+        )
