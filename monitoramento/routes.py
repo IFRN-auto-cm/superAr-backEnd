@@ -67,13 +67,6 @@ def registrar_status_mqtt():
         dados=dados,
     )
 
-    print("statistics: ")
-    print(statistics)
-
-
-    # print("**************************************************")
-    # print(redis.consultar_estado_dispositivo(device["id"]))
-
     return jsonify({
                 "mensagem": "Status registrado",
                 "resultado": sala_condicionador
@@ -91,7 +84,6 @@ def registrar_availability():
             "erro": "Corpo da requisição deve ser um JSON"
         }), 400
 
-    print(dados)
     device_id = dados.get("atuador")
 
     sql = """
@@ -117,7 +109,6 @@ def registrar_availability():
             "erro": "Não foi possível registrar o status"
         }), 500
 
-    print(sala_condicionador)
     ar_id = sala_condicionador.get("ar_cadastrado_id")
     sala_id = sala_condicionador.get("sala_id")
     redis.atualizar_online_offline(ar_id, sala_id, device_id, dados.get("online"))
@@ -131,7 +122,7 @@ def registrar_availability():
 def enviar_status_ar(ar_cadastrado_id):
 
     resposta = redis.consultar_estado_dispositivo(ar_cadastrado_id)
-    print(resposta)
+    # print(resposta)
 
     return jsonify({
             "status": "ok",

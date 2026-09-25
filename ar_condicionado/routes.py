@@ -295,8 +295,6 @@ def listar_ar_cadastrados():
             else:
                 ar["status"]                = "desconhecido"
                 ar["temperatura_medida"]    = "desconhecido"
-            print("vamos q vamos %s", ar["id"])
-            print(arStatus)
 
 
         return jsonify({
