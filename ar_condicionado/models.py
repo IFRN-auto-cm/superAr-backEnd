@@ -1,9 +1,6 @@
 from typing import Optional
 import decimal
 
-from modelos_marcas.models import ModelosMarcas
-from salas.models import Salas
-
 from database import Base
 
 from sqlalchemy import DECIMAL, ForeignKeyConstraint, Index, Integer, String

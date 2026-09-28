@@ -1,6 +1,3 @@
-from comandos.models import Comandos
-from ar_condicionado.models import ArCadastrados
-
 from database import Base
 
 from typing import Optional

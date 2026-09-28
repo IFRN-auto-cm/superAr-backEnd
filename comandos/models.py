@@ -1,5 +1,3 @@
-
-from modelos_marcas.models import ModelosMarcasComando
 from database import Base
 from sqlalchemy import DECIMAL, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
