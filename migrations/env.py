@@ -1,4 +1,9 @@
 from logging.config import fileConfig
+from ar_condicionado.models import ArCadastrados
+from comandos.models import Comandos
+from modelos_marcas.models import ModelosMarcasComando
+from modelos_marcas.models import ModelosMarcas
+from salas.models import Salas
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
