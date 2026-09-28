@@ -14,4 +14,5 @@ simple-websocket
 SQLAlchemy==2.0.52
 sqlacodegen==4.0.4
 PyMySQL==1.2.0
-cryptography
+cryptography    
+alembic
