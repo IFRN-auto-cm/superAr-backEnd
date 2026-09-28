@@ -3,6 +3,48 @@ import os
 import MySQLdb
 from MySQLdb.cursors import DictCursor
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+
+# ============================================================
+# SQLAlchemy
+# ============================================================
+
+class Base(DeclarativeBase):
+    pass
+
+
+DATABASE_URL = (
+    f"mysql+mysqldb://"
+    f"{os.getenv('MYSQL_USER')}:"
+    f"{os.getenv('MYSQL_PASSWORD')}@"
+    f"{os.getenv('HOST_DATABASE')}:"
+    f"{os.getenv('DB_PORT', '3306')}/"
+    f"{os.getenv('MYSQL_DATABASE')}"
+)
+
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=3600
+)
+
+
+SessionLocal = sessionmaker(
+    bind=engine,
+    autoflush=False,
+    expire_on_commit=False
+)
+
+
+def get_session():
+    return SessionLocal()
+
+# ============================================================
+# MySQLdb - código legado
+# ============================================================
 
 def get_db():
 
