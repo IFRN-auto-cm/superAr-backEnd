@@ -1,4 +1,11 @@
+import os
+
 from logging.config import fileConfig
+from ar_condicionado.models import ArCadastrados
+from comandos.models import Comandos
+from modelos_marcas.models import ModelosMarcasComando
+from modelos_marcas.models import ModelosMarcas
+from salas.models import Salas
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -9,6 +16,25 @@ from database import Base
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+MYSQL_USER = os.getenv("MYSQL_USER")
+MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD")
+MYSQL_DATABASE = os.getenv("MYSQL_DATABASE")
+
+DB_PORT = os.getenv("DB_PORT")
+HOST_DATABASE = os.getenv("HOST_DATABASE")
+
+DATABASE_URL = (
+    f"mysql+mysqldb://{MYSQL_USER}:"
+    f"{MYSQL_PASSWORD}@"
+    f"{HOST_DATABASE}:{DB_PORT}/"
+    f"{MYSQL_DATABASE}"
+)
+
+config.set_main_option(
+    "sqlalchemy.url",
+    DATABASE_URL
+)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
