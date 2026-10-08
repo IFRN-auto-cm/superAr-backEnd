@@ -379,6 +379,7 @@ def associar_modelo_comando():
 def inserir_ar_cadastrado():
     data = request.json or {}
 
+
     # temperatura_medida = data.get("temperatura_medida")
     temperatura_referencia = data.get("temperatura_referencia")
     modelo_marca = data.get("marcaModeloId")

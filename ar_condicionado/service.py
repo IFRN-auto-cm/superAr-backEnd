@@ -1,9 +1,12 @@
 import json
+from urllib import request
 
 import mqtt_service_client
 import redisAccess as redis
 from modelos_marcas.service import listar_modelos_marcas
 from salas.service import lista_salas
+
+from models import ArCadastrados
 
 from . import repository
 
@@ -19,19 +22,36 @@ def publicar_mqtt(endereco, payload):
     )
 
 
-def inserir_ar_cadastrado(data):
-    modelo_marca = data.get("marcaModeloId")
-    if not modelo_marca:
-        raise ValueError("modelo_marca é obrigatório")
+def inserir_ar_cadastrado():
+    data = request.get.json or {}
 
-    return repository.inserir_ar_cadastrado(
-        temperatura_referencia=data.get("temperatura_referencia"),
-        modelo_marca=modelo_marca,
-        status=data.get("status"),
-        atuador=data.get("atuador"),
-        nome=data.get("nome"),
-        sala=data.get("sala"),
-    )
+    temperatura_referencia = data.get("temperatura_referencia")
+    modelo_marca = data.get("marcaModeloId")
+    status = data.get("status")
+    atuador = data.get("atuador")
+    nome = data.get("nome")
+    sala = data.get("sala")
+
+    if not modelo_marca:
+        return jsonify({
+            "status": "erro",
+            "mensagem": "modelo_marca é obrigatório"
+        }), 400
+
+
+    
+    # modelo_marca = data.get("marcaModeloId")
+    # if not modelo_marca:
+    #     raise ValueError("modelo_marca é obrigatório")
+
+    # return repository.inserir_ar_cadastrado(
+    #     temperatura_referencia=data.get("temperatura_referencia"),
+    #     modelo_marca=modelo_marca,
+    #     status=data.get("status"),
+    #     atuador=data.get("atuador"),
+    #     nome=data.get("nome"),
+    #     sala=data.get("sala"),
+    # )
 
 
 def atualizar_ar(ar_cadastrado_id, data):
