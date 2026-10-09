@@ -9,7 +9,9 @@ bp = Blueprint("ar_condicionado", __name__)
 @bp.route("/ar-cadastrados", methods=["POST"])
 def inserir_ar_cadastrado():
     try:
-        novo_id = service.inserir_ar_cadastrado(request.json)
+        novo_id = service.inserir_ar_cadastrado(
+            request.get_json(silent=True)
+        )
         return jsonify({"status": "ok", "id": novo_id})
     except ValueError as erro:
         return jsonify({"status": "erro", "mensagem": str(erro)}), 400
@@ -22,7 +24,7 @@ def update_ar_cadastrado(ar_cadastrado_id):
     try:
         linhas_afetadas = service.atualizar_ar(
             ar_cadastrado_id,
-            request.json,
+            request.get_json(silent=True),
         )
         return jsonify({
             "status": "ok",
@@ -42,7 +44,7 @@ def enviar_comando_ar(ar_cadastrado_id):
     try:
         resposta = service.enviar_comando_ar(
             ar_cadastrado_id,
-            request.json.get("comando_nome"),
+            (request.get_json(silent=True) or {}).get("comando_nome"),
         )
         return jsonify(resposta)
     except ValueError as erro:
