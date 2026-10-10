@@ -1,38 +1,39 @@
-from database import (
-    executar_delete,
-    executar_insert,
-    executar_insert_many,
-    executar_select,
-    get_db,
-)
+from sqlalchemy import case, delete, select, update
+from sqlalchemy.dialects.mysql import insert as mysql_insert
+
+from comandos.models import Comandos
+from database import SessionLocal
+from .models import ModelosMarcas, ModelosMarcasComando
 
 
 def deletar_modelo_marca(modelo_marca_id):
-    return executar_delete(
-        """
-        DELETE FROM modelos_marcas
-        WHERE id = %s
-        """,
-        (modelo_marca_id,),
-    )
+    with SessionLocal.begin() as session:
+        resultado = session.execute(
+            delete(ModelosMarcas).where(ModelosMarcas.id == modelo_marca_id)
+        )
+        return resultado.rowcount
 
 
 def inserir_modelo_marca(marca, modelo):
-    return executar_insert(
-        "INSERT INTO modelos_marcas (marca, modelo) VALUES (%s, %s)",
-        (marca, modelo),
-    )
+    with SessionLocal.begin() as session:
+        novo_modelo_marca = ModelosMarcas(marca=marca, modelo=modelo)
+        session.add(novo_modelo_marca)
+        session.flush()
+        return novo_modelo_marca.id
 
 
 def associar_modelo_comandos(associacoes):
-    executar_insert_many(
-        """
-        INSERT INTO modelosMarcas_comando
-        (modelo_marcas, comando, comando_valor)
-        VALUES (%s, %s, %s)
-        """,
-        associacoes,
-    )
+    with SessionLocal.begin() as session:
+        session.add_all(
+            [
+                ModelosMarcasComando(
+                    modelo_marcas=modelo_marcas,
+                    comando=comando,
+                    comando_valor=comando_valor,
+                )
+                for modelo_marcas, comando, comando_valor in associacoes
+            ]
+        )
 
 
 def atualizar_modelo_marca_comandos(
@@ -42,108 +43,107 @@ def atualizar_modelo_marca_comandos(
     comandos_para_remover,
     comandos_para_salvar,
 ):
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("START TRANSACTION")
-        cursor.execute(
-            """
-            UPDATE modelos_marcas
-            SET marca = %s, modelo = %s
-            WHERE id = %s
-            """,
-            (marca, modelo, modelo_marcas_id),
+    with SessionLocal.begin() as session:
+        session.execute(
+            update(ModelosMarcas)
+            .where(ModelosMarcas.id == modelo_marcas_id)
+            .values(marca=marca, modelo=modelo)
         )
 
         for comando_id in comandos_para_remover:
-            cursor.execute(
-                """
-                DELETE FROM modelosMarcas_comando
-                WHERE modelo_marcas = %s
-                  AND comando = %s
-                """,
-                (modelo_marcas_id, comando_id),
+            session.execute(
+                delete(ModelosMarcasComando).where(
+                    ModelosMarcasComando.modelo_marcas == modelo_marcas_id,
+                    ModelosMarcasComando.comando == comando_id,
+                )
             )
 
-        for associacao in comandos_para_salvar:
-            cursor.execute(
-                """
-                INSERT INTO modelosMarcas_comando
-                    (modelo_marcas, comando, comando_valor)
-                VALUES
-                    (%s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    comando_valor = VALUES(comando_valor)
-                """,
-                associacao,
+        for modelo_id, comando_id, comando_valor in comandos_para_salvar:
+            stmt = mysql_insert(ModelosMarcasComando).values(
+                modelo_marcas=modelo_id,
+                comando=comando_id,
+                comando_valor=comando_valor,
             )
-
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        cursor.close()
+            session.execute(
+                stmt.on_duplicate_key_update(comando_valor=comando_valor)
+            )
 
 
 def listar_modelos_marcas():
-    return executar_select(
-        """
-        SELECT id, marca, modelo
-        FROM modelos_marcas
-        ORDER BY marca, modelo
-        """
-    )
+    consulta = select(
+        ModelosMarcas.id,
+        ModelosMarcas.marca,
+        ModelosMarcas.modelo,
+    ).order_by(ModelosMarcas.marca, ModelosMarcas.modelo)
+    with SessionLocal() as session:
+        return [
+            dict(row) for row in session.execute(consulta).mappings().all()
+        ]
 
 
 def buscar_dados_edicao_modelo_marca(modelo_marca_id):
-    marca_modelo = executar_select(
-        """
-        SELECT id, marca, modelo
-        FROM modelos_marcas
-        WHERE id = %s
-        ORDER BY marca, modelo
-        """,
-        (modelo_marca_id,),
+    marca_modelo_stmt = (
+        select(
+            ModelosMarcas.id,
+            ModelosMarcas.marca,
+            ModelosMarcas.modelo,
+        )
+        .where(ModelosMarcas.id == modelo_marca_id)
+        .order_by(ModelosMarcas.marca, ModelosMarcas.modelo)
     )
-    comandos = executar_select(
-        """
-        SELECT
-            c.id AS comando_id,
-            c.nome AS comando_nome,
-            CASE
-                WHEN mmc.id IS NULL THEN false
-                ELSE true
-            END AS cadastrado_no_modelo
-        FROM comandos c
-        LEFT JOIN modelosMarcas_comando mmc
-            ON mmc.comando = c.id
-           AND mmc.modelo_marcas = %s
-        ORDER BY c.nome
-        """,
-        (modelo_marca_id,),
+    cadastrado_no_modelo = case(
+        (ModelosMarcasComando.id.is_(None), False),
+        else_=True,
+    ).label("cadastrado_no_modelo")
+    comandos_stmt = (
+        select(
+            Comandos.id.label("comando_id"),
+            Comandos.nome.label("comando_nome"),
+            cadastrado_no_modelo,
+        )
+        .outerjoin(
+            ModelosMarcasComando,
+            (ModelosMarcasComando.comando == Comandos.id)
+            & (ModelosMarcasComando.modelo_marcas == modelo_marca_id),
+        )
+        .order_by(Comandos.nome)
     )
+
+    with SessionLocal() as session:
+        marca_modelo = [
+            dict(row)
+            for row in session.execute(marca_modelo_stmt).mappings().all()
+        ]
+        comandos = [
+            dict(row)
+            for row in session.execute(comandos_stmt).mappings().all()
+        ]
     return marca_modelo, comandos
 
 
 def listar_comandos_por_modelo_marca(modelo_marca_id):
-    return executar_select(
-        """
-        SELECT
-            mmc.id AS associacao_id,
-            mm.id AS modelo_marca_id,
-            mm.marca,
-            mm.modelo,
-            c.id AS comando_id,
-            c.nome AS comando_nome,
-            mmc.comando_valor
-        FROM modelosMarcas_comando mmc
-        INNER JOIN modelos_marcas mm
-            ON mm.id = mmc.modelo_marcas
-        INNER JOIN comandos c
-            ON c.id = mmc.comando
-        WHERE mm.id = %s
-        ORDER BY c.nome
-        """,
-        (modelo_marca_id,),
+    consulta = (
+        select(
+            ModelosMarcasComando.id.label("associacao_id"),
+            ModelosMarcas.id.label("modelo_marca_id"),
+            ModelosMarcas.marca,
+            ModelosMarcas.modelo,
+            Comandos.id.label("comando_id"),
+            Comandos.nome.label("comando_nome"),
+            ModelosMarcasComando.comando_valor,
+        )
+        .join(
+            ModelosMarcas,
+            ModelosMarcas.id == ModelosMarcasComando.modelo_marcas,
+        )
+        .join(
+            Comandos,
+            Comandos.id == ModelosMarcasComando.comando,
+        )
+        .where(ModelosMarcas.id == modelo_marca_id)
+        .order_by(Comandos.nome)
     )
+    with SessionLocal() as session:
+        return [
+            dict(row) for row in session.execute(consulta).mappings().all()
+        ]
