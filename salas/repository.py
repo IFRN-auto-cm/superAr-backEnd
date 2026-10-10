@@ -1,23 +1,42 @@
-"""Acesso a dados desta funcionalidade. Funções compartilhadas estão em database.py."""
-from database import executar_insert, executar_select
+"""Acesso a dados da funcionalidade de salas."""
+from sqlalchemy import select, text
+
+from database import SessionLocal
+from .models import Salas
 
 
 def inserir_sala(nome, predio, numero_de_ar, ar1, ar2, ar3, ar4):
-    return executar_insert(
+    consulta = text(
         """
         INSERT INTO salas
         (nome, predio, numero_de_ar, ar1, ar2, ar3, ar4)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """,
-        (nome, predio, numero_de_ar, ar1, ar2, ar3, ar4),
+        VALUES (:nome, :predio, :numero_de_ar, :ar1, :ar2, :ar3, :ar4)
+        """
     )
+    with SessionLocal.begin() as session:
+        resultado = session.execute(
+            consulta,
+            {
+                "nome": nome,
+                "predio": predio,
+                "numero_de_ar": numero_de_ar,
+                "ar1": ar1,
+                "ar2": ar2,
+                "ar3": ar3,
+                "ar4": ar4,
+            },
+        )
+        return resultado.lastrowid
 
 
 def lista_salas():
-    return executar_select(
-        """
-        SELECT id, nome, codigo, predio
-        FROM salas
-        ORDER BY codigo, nome
-        """
-    )
+    consulta = select(
+        Salas.id,
+        Salas.nome,
+        Salas.codigo,
+        Salas.predio,
+    ).order_by(Salas.codigo, Salas.nome)
+    with SessionLocal() as session:
+        return [
+            dict(row) for row in session.execute(consulta).mappings().all()
+        ]
