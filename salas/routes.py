@@ -21,3 +21,17 @@ def api_lista_salas():
     salas = service.lista_salas()
     status_code = 200 if salas["status"] == "ok" else 500
     return jsonify(salas), status_code
+
+
+@bp.route("/salas/<int:sala_id>", methods=["GET"])
+def api_obter_sala(sala_id):
+    try:
+        sala = service.obter_sala(sala_id)
+        if sala is None:
+            return jsonify({
+                "status": "erro",
+                "mensagem": "Sala não encontrada",
+            }), 404
+        return jsonify({"status": "ok", "dados": sala})
+    except Exception as erro:
+        return jsonify({"status": "erro", "mensagem": str(erro)}), 500

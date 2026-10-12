@@ -23,3 +23,7 @@ def lista_salas():
         return {"status": "ok", "dados": resultado}
     except Exception as erro:
         return {"status": "erro", "mensagem": str(erro)}
+
+
+def obter_sala(sala_id):
+    return repository.obter_sala(sala_id)
