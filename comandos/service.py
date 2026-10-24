@@ -1,5 +1,8 @@
 import re
 
+from . import repository
+
+
 def normalizar(texto):
     # Encontra o primeiro número na string
     numero = re.search(r'\d+', texto)
@@ -16,3 +19,26 @@ def normalizar(texto):
     descricao = re.sub(r'\s+', '', descricao).lower()
 
     return f"{descricao} {numero}"
+
+
+def inserir_comando(data):
+    if not isinstance(data, dict):
+        raise ValueError("nome é obrigatório")
+
+    nome = data.get("nome")
+    if not isinstance(nome, str) or not nome.strip():
+        raise ValueError("nome é obrigatório")
+
+    nome = normalizar(nome)
+    if not nome:
+        raise ValueError("nome é obrigatório")
+
+    return repository.inserir_comando(nome)
+
+
+def deletar_comando(comando_id):
+    return repository.deletar_comando(comando_id)
+
+
+def listar_comandos():
+    return repository.listar_comandos()
