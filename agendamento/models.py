@@ -1,4 +1,7 @@
-from typing import Optional
+from typing import Optional 
+from models.models import Base 
+from comandos.models import Comandos 
+from ar_condicionado.models import ArCadastrados
 import decimal
 import datetime
 from sqlalchemy import (
@@ -19,29 +22,8 @@ from sqlalchemy.orm import (
     relationship
     )
 
-class Base(DeclarativeBase):
-    pass
 
-class Comandos(Base):
-    __tablename__ = 'comandos'
-    __table_args__ = (
-        Index('uq_comandos_nome', 'nome', unique=True),
-    )
 
-    id: Mapped[int] = mapped_column(
-        Integer, 
-        primary_key=True, 
-        autoincrement=True  
-        )
-    
-    nome: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False)
-
-    agendamento_acoes: Mapped[list["AgendamentoAcoes"]] = relationship(
-        "AgendamentoAcoes",
-        back_populates="comando"
-    )
 
 
 class Agendamentos(Base):
@@ -196,7 +178,7 @@ class AgendamentoAcoes(Base):
         nullable=False
         )
     
-    ar_id:Mapped[int] = mapped_column(Integer,
+    ar_id:Mapped[int] = mapped_column(ForeignKey('ar_cadastrados.id'),
                                       nullable=False)
 
     agendamento: Mapped["Agendamentos"] = relationship(
@@ -206,6 +188,10 @@ class AgendamentoAcoes(Base):
 
     comando: Mapped["Comandos"] = relationship(
         "Comandos",
+        back_populates="agendamento_acoes"
+    ) 
+    ar_cadastrados:Mapped["ArCadastrados"] = relationship(
+        "ArCadastrados",
         back_populates="agendamento_acoes"
     )
 

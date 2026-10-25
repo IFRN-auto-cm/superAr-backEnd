@@ -1,6 +1,8 @@
 from database import Base
 from sqlalchemy import DECIMAL, Index, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship 
+from agendamento.models import *
+from modelos_marcas.models import *
 
 class Comandos(Base):
     __tablename__ = 'comandos'
@@ -11,5 +13,9 @@ class Comandos(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nome: Mapped[str] = mapped_column(String(100), nullable=False)
 
-    modelosMarcas_comando: Mapped[list['ModelosMarcasComando']] = relationship('ModelosMarcasComando', back_populates='comandos')
+    modelosMarcas_comando: Mapped[list['ModelosMarcasComando']] = relationship('ModelosMarcasComando', back_populates='comandos') 
+    agendamento_acoes: Mapped[list["AgendamentoAcoes"]] = relationship(
+            "AgendamentoAcoes",
+            back_populates="comando"
+        )
 

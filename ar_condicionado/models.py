@@ -1,7 +1,10 @@
 from typing import Optional
-import decimal
+from modelos_marcas.models import ModelosMarcas 
+from salas.models import Salas 
+from agendamento.models import AgendamentoAcoes
+import decimal 
 
-from database import Base
+from models.models import Base
 
 from sqlalchemy import DECIMAL, ForeignKeyConstraint, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -26,6 +29,11 @@ class ArCadastrados(Base):
     sala: Mapped[Optional[int]] = mapped_column(Integer)
 
     modelos_marcas: Mapped['ModelosMarcas'] = relationship('ModelosMarcas', back_populates='ar_cadastrados')
-    salas: Mapped[Optional['Salas']] = relationship('Salas', back_populates='ar_cadastrados')
+    salas: Mapped[Optional['Salas']] = relationship('Salas', back_populates='ar_cadastrados') 
+    agendamento_acoes:Mapped[list["AgendamentoAcoes"]] = relationship(
+            "AgendamentoAcoes",
+            back_populates="ar_cadastrados"
+        )
+    
 
 
