@@ -14,8 +14,9 @@ def create_app():
     from modelos_marcas.routes import bp as modelos_marcas_bp
     from ar_condicionado.routes import bp as ar_condicionado_bp
     from salas.routes import bp as salas_bp
-    from monitoramento.routes import bp as monitoramento_bp
-    for blueprint in (comandos_bp, modelos_marcas_bp, ar_condicionado_bp, salas_bp, monitoramento_bp):
+    from monitoramento.routes import bp as monitoramento_bp 
+    from agendamento.routes import bp as agendamento_bp
+    for blueprint in (comandos_bp, modelos_marcas_bp, ar_condicionado_bp, salas_bp, monitoramento_bp,agendamento_bp):
         app.register_blueprint(blueprint)
     return app
 
