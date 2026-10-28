@@ -1,50 +1,7 @@
-from datetime import datetime
-
-
-def buscar_dados_simulados():
-    agendamentos = [
-        {
-            "id": 1,
-            "nome": "Ligar laboratório",
-            "horario": "07:00:00",
-            "inicio_validade": datetime(2026, 10, 1),
-            "fim_validade": None,
-            "ativo": True
-        }
-    ]
-
-    dias = [
-        {"agendamento_id": 1, "dia_semana": dia}
-        for dia in range(5)
-    ]
-
-    acoes = [
-        {
-            "id": 1,
-            "agendamento_id": 1,
-            "comando_id": 1,
-            "comando_nome": "Ligar",
-            "valor": "23",
-            "ordem": 1,
-            "aparelho_id": 3,
-            "aparelho_nome": "Ar do laboratório"
-        },
-        {
-            "id": 2,
-            "agendamento_id": 1,
-            "comando_id": 2,
-            "comando_nome": "Ligar",
-            "valor": "23",
-            "ordem": 2,
-            "aparelho_id": 4,
-            "aparelho_nome": "Ar do laboratório 2"
-        }
-    ]
-
-    return agendamentos, dias, acoes    
+from .repository import buscar_dados_agendamentos 
 
 def listar_agendamentos():
-    registros, dias, acoes = buscar_dados_simulados()
+    registros, dias, acoes = buscar_dados_agendamentos()
 
     por_id = {}
 

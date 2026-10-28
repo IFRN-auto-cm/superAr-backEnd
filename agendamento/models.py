@@ -1,5 +1,5 @@
 from typing import Optional 
-from models.models import Base 
+from database import Base 
 from comandos.models import Comandos 
 from ar_condicionado.models import ArCadastrados
 import decimal

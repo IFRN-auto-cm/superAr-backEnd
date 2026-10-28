@@ -4,7 +4,7 @@ from salas.models import Salas
 from agendamento.models import AgendamentoAcoes
 import decimal 
 
-from models.models import Base
+from database import Base
 
 from sqlalchemy import DECIMAL, ForeignKeyConstraint, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship

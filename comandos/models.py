@@ -1,4 +1,4 @@
-from database import Base
+from database import Base 
 from sqlalchemy import DECIMAL, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from agendamento.models import *

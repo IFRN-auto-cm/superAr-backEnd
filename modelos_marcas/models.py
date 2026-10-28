@@ -1,7 +1,8 @@
 from database import Base
 from sqlalchemy import DECIMAL, ForeignKeyConstraint, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
+from ar_condicionado.models import ArCadastrados 
+from comandos.models import Comandos
 
 class ModelosMarcas(Base):
     __tablename__ = 'modelos_marcas'
