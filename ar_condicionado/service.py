@@ -3,7 +3,7 @@ import json
 import mqtt_service_client
 import redisAccess as redis
 from modelos_marcas.service import listar_modelos_marcas
-from salas.service import lista_salas
+from salas.service import lista_salas_basicas as lista_salas
 
 from . import repository
 
