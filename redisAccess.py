@@ -21,11 +21,16 @@ def converter_booleano(valor: Any) -> str:
   return "1" if bool(valor) else "0"
 
 def atualizar_online_offline(ar_id, sala_id, device_id, online: bool) -> None:
-  print("Ar id: ", ar_id)
-  print("Sala id: ", sala_id)
-  print("Device id: ", device_id)
-  print("Online: ", online)
-  pass
+  online_key = f"superar:device:{ar_id}:online"
+  if online:
+    redis_client.set(online_key, "1", ex=ONLINE_TTL_SECONDS)
+  else:
+    redis_client.delete(online_key)
+
+
+def consultar_disponibilidade_dispositivo(ar_id: int) -> bool:
+  online_key = f"superar:device:{ar_id}:online"
+  return bool(redis_client.exists(online_key))
 
 def atualizar_estado_dispositivo(ar_id, sala_id, dados: dict[str, Any]) -> None:
 

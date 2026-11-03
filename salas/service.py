@@ -1,3 +1,5 @@
+import redisAccess as redis
+
 from . import repository
 
 
@@ -14,12 +16,40 @@ def inserir_sala(data):
         ar2=data.get("ar2"),
         ar3=data.get("ar3"),
         ar4=data.get("ar4"),
+        cod_dashboard_sala=data.get("codDashboardSala"),
     )
 
 
 def lista_salas():
     try:
         resultado = repository.lista_salas()
+        for sala in resultado:
+            temperaturas = []
+            condicionadores = []
+            for ar in sala.pop("ar_condicionados"):
+                estado = redis.consultar_estado_dispositivo(ar["id"])
+                online = (
+                    estado.get("online", False)
+                    if estado is not None
+                    else redis.consultar_disponibilidade_dispositivo(ar["id"])
+                )
+                condicionadores.append(
+                    {
+                        "nome": ar["nome"] or f"condAr{ar['id']}",
+                        "status": "online" if online else "offline",
+                    }
+                )
+                if estado is not None:
+                    temperatura = estado.get("temperatura_medida")
+                    if temperatura is not None:
+                        temperaturas.append(float(temperatura))
+
+            sala["condicionadoresAr"] = condicionadores
+            sala["temperatura"] = (
+                sum(temperaturas) / len(temperaturas)
+                if temperaturas
+                else None
+            )
         return {"status": "ok", "dados": resultado}
     except Exception as erro:
         return {"status": "erro", "mensagem": str(erro)}

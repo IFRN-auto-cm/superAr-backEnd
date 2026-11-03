@@ -12,6 +12,7 @@ class Salas(Base):
     nome: Mapped[str] = mapped_column(String(100), nullable=False)
     predio: Mapped[Optional[str]] = mapped_column(String(100))
     codigo: Mapped[Optional[str]] = mapped_column(String(100))
+    codDashboardSala: Mapped[Optional[str]] = mapped_column(String(100))
     ref_mapa: Mapped[Optional[str]] = mapped_column(String(255))
 
     ar_cadastrados: Mapped[list['ArCadastrados']] = relationship('ArCadastrados', back_populates='salas')

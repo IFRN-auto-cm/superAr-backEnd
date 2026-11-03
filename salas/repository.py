@@ -7,12 +7,24 @@ from modelos_marcas.models import ModelosMarcas
 from .models import Salas
 
 
-def inserir_sala(nome, predio, numero_de_ar, ar1, ar2, ar3, ar4):
+def inserir_sala(
+    nome,
+    predio,
+    numero_de_ar,
+    ar1,
+    ar2,
+    ar3,
+    ar4,
+    cod_dashboard_sala=None,
+):
     consulta = text(
         """
         INSERT INTO salas
-        (nome, predio, numero_de_ar, ar1, ar2, ar3, ar4)
-        VALUES (:nome, :predio, :numero_de_ar, :ar1, :ar2, :ar3, :ar4)
+        (nome, predio, numero_de_ar, ar1, ar2, ar3, ar4, codDashboardSala)
+        VALUES (
+            :nome, :predio, :numero_de_ar, :ar1, :ar2, :ar3, :ar4,
+            :cod_dashboard_sala
+        )
         """
     )
     with SessionLocal.begin() as session:
@@ -26,6 +38,7 @@ def inserir_sala(nome, predio, numero_de_ar, ar1, ar2, ar3, ar4):
                 "ar2": ar2,
                 "ar3": ar3,
                 "ar4": ar4,
+                "cod_dashboard_sala": cod_dashboard_sala,
             },
         )
         return resultado.lastrowid
@@ -37,11 +50,35 @@ def lista_salas():
         Salas.nome,
         Salas.codigo,
         Salas.predio,
-    ).order_by(Salas.codigo, Salas.nome)
+        Salas.codDashboardSala,
+        ArCadastrados.id.label("ar_id"),
+        ArCadastrados.nome.label("nome_ar"),
+    ).outerjoin(
+        ArCadastrados,
+        ArCadastrados.sala == Salas.id,
+    ).order_by(Salas.codigo, Salas.nome, ArCadastrados.nome)
     with SessionLocal() as session:
-        return [
-            dict(row) for row in session.execute(consulta).mappings().all()
-        ]
+        salas = {}
+        for row in session.execute(consulta).mappings():
+            sala = salas.setdefault(
+                row["id"],
+                {
+                    "id": row["id"],
+                    "nome": row["nome"],
+                    "codigo": row["codigo"],
+                    "predio": row["predio"],
+                    "codDashboardSala": row["codDashboardSala"],
+                    "ar_condicionados": [],
+                },
+            )
+            if row["ar_id"] is not None:
+                sala["ar_condicionados"].append(
+                    {
+                        "id": row["ar_id"],
+                        "nome": row["nome_ar"],
+                    }
+                )
+        return list(salas.values())
 
 
 def obter_sala(sala_id):
@@ -50,6 +87,7 @@ def obter_sala(sala_id):
         Salas.nome,
         Salas.codigo,
         Salas.predio,
+        Salas.codDashboardSala,
     ).where(Salas.id == sala_id)
     consulta_ares = (
         select(
