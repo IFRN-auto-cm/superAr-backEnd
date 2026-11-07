@@ -51,9 +51,16 @@ def lista_salas_dashboard():
         Salas.cod_dashboard_sala.label("codDashboardSala"),
         ArCadastrados.id.label("ar_id"),
         ArCadastrados.nome.label("nome_ar"),
+        ArCadastrados.temperatura_referencia,
+        ArCadastrados.atuador,
+        ModelosMarcas.marca,
+        ModelosMarcas.modelo,
     ).outerjoin(
         ArCadastrados,
         ArCadastrados.sala == Salas.id,
+    ).outerjoin(
+        ModelosMarcas,
+        ArCadastrados.modelo_marca == ModelosMarcas.id,
     ).order_by(Salas.codigo, Salas.nome, ArCadastrados.nome)
     with SessionLocal() as session:
         salas = {}
@@ -71,19 +78,35 @@ def lista_salas_dashboard():
             )
             if row["ar_id"] is not None:
                 sala["ar_condicionados"].append(
-                    {"id": row["ar_id"], "nome_ar": row["nome_ar"]}
+                    {
+                        "id": row["ar_id"],
+                        "nome_ar": row["nome_ar"],
+                        "temperatura_referencia": row["temperatura_referencia"],
+                        "atuador": row["atuador"],
+                        "marca": row["marca"],
+                        "modelo": row["modelo"],
+                    }
                 )
         return list(salas.values())
 
 
-def obter_sala(sala_id):
+def obter_sala(sala_id=None, codigo=None, cod_dashboard_sala=None):
     consulta_sala = select(
         Salas.id,
         Salas.nome,
         Salas.codigo,
         Salas.predio,
         Salas.cod_dashboard_sala.label("codDashboardSala"),
-    ).where(Salas.id == sala_id)
+    )
+    if sala_id is not None:
+        consulta_sala = consulta_sala.where(Salas.id == sala_id)
+    elif codigo is not None:
+        consulta_sala = consulta_sala.where(Salas.codigo == codigo)
+    else:
+        consulta_sala = consulta_sala.where(
+            Salas.cod_dashboard_sala == cod_dashboard_sala
+        )
+
     consulta_ares = (
         select(
             ArCadastrados.id,
@@ -99,7 +122,6 @@ def obter_sala(sala_id):
             ModelosMarcas,
             ArCadastrados.modelo_marca == ModelosMarcas.id,
         )
-        .where(ArCadastrados.sala == sala_id)
         .order_by(ArCadastrados.nome)
     )
 
@@ -109,6 +131,9 @@ def obter_sala(sala_id):
             return None
 
         dados_sala = dict(sala)
+        consulta_ares = consulta_ares.where(
+            ArCadastrados.sala == dados_sala["id"]
+        )
         dados_sala["ar_condicionados"] = [
             dict(row)
             for row in session.execute(consulta_ares).mappings().all()
